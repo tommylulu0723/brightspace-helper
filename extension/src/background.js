@@ -6,6 +6,7 @@ import { cloud, CloudError, compactSnapshot, mergeState, publicSettings } from '
 import { diffSync, mergeUpdates, describeUpdate } from './lib/changes.js';
 import { buildPlan } from './lib/plan.js';
 import { unreadCount } from './lib/feed.js';
+import { VERSION_NOTES } from './config.js';
 
 const ALARM = 'sync';
 const PERIOD_MIN = 30;
@@ -28,11 +29,61 @@ async function tabFetcher(url) {
   return res.result;
 }
 
+const UPDATE_ALARM = 'self-update';
+
 async function ensureAlarm() {
   const a = await chrome.alarms.get(ALARM);
   if (!a || a.periodInMinutes !== PERIOD_MIN) {
     await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: PERIOD_MIN });
   }
+  const u = await chrome.alarms.get(UPDATE_ALARM);
+  if (!u) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 1 });
+}
+
+// ---------------- 自动更新 ----------------
+// 插件文件夹是 GitHub 仓库，Mac 上的定时任务每分钟 git pull 一次。
+// 这里每分钟读一次磁盘上的 manifest.json：版本号变了就自动重新加载，用上新代码。
+async function checkSelfUpdate() {
+  if (chrome.runtime.getManifest().update_url) return; // 从应用商店装的由 Chrome 自己更新
+  let disk;
+  try {
+    const r = await fetch(chrome.runtime.getURL('manifest.json'), { cache: 'no-store' });
+    disk = JSON.parse(await r.text());
+  } catch {
+    return; // 正在拉取、文件写到一半时可能读到不完整的内容，下一分钟再看
+  }
+  const running = chrome.runtime.getManifest().version;
+  if (!disk?.version || disk.version === running) return;
+  // 确认新版本的后台脚本完整可读，避免拉到一半就重启
+  try {
+    const bg = disk.background?.service_worker;
+    if (bg) {
+      const r = await fetch(chrome.runtime.getURL(bg), { cache: 'no-store' });
+      if (!r.ok || !(await r.text()).trim()) return;
+    }
+  } catch {
+    return;
+  }
+  await chrome.storage.local.set({ justUpdated: { from: running, to: disk.version, at: new Date().toISOString() } });
+  chrome.runtime.reload();
+}
+
+async function announceUpdate() {
+  const { justUpdated } = await chrome.storage.local.get('justUpdated');
+  if (!justUpdated) return;
+  await chrome.storage.local.remove('justUpdated');
+  const v = chrome.runtime.getManifest().version;
+  if (justUpdated.to !== v) return;
+  let note = '';
+  const n = VERSION_NOTES.find((x) => x.v === v);
+  if (n) note = n.items.slice(0, 2).map((x) => `• ${x}`).join('\n');
+  chrome.notifications.create(`updated:${v}`, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+    title: `课程助手已自动更新到 ${v}`,
+    message: note || '点这里看更新了什么',
+    priority: 0
+  });
 }
 
 async function setStatus(patch) {
@@ -268,7 +319,10 @@ async function cleanupRemovedAi() {
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   await ensureAlarm();
-  if (details.reason === 'update') await cleanupRemovedAi();
+  if (details.reason === 'update') {
+    await cleanupRemovedAi();
+    await announceUpdate();
+  }
   // 动态的"已读"起点：装好之前的旧公告不算未读
   const { seenAt } = await chrome.storage.local.get('seenAt');
   if (!seenAt) await chrome.storage.local.set({ seenAt: Date.now() });
@@ -284,11 +338,12 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === UPDATE_ALARM) checkSelfUpdate();
   if (a.name === ALARM) syncNow('alarm');
 });
 
 chrome.notifications.onClicked.addListener((id) => {
-  const hash = id.startsWith('updates') ? '#updates' : '#deadlines';
+  const hash = id.startsWith('updates') ? '#updates' : id.startsWith('updated:') ? '#settings' : '#deadlines';
   const url = id === 'login' ? `${BASE_URL}/d2l/home` : chrome.runtime.getURL(DASHBOARD) + hash;
   chrome.tabs.create({ url });
   chrome.notifications.clear(id);

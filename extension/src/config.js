@@ -4,6 +4,14 @@ export const DEFAULT_SERVER = '';
 
 export const VERSION_NOTES = [
   {
+    v: '1.1.1',
+    d: '2026-10-21',
+    items: [
+      '自动更新：配合 GitHub 仓库和电脑上的定时任务，有新版本时 1–2 分钟内自动重新加载，并弹通知告诉你更新了什么',
+      'Windows 一键安装脚本：deploy/windows-setup.ps1（Mac 用 deploy/mac-setup.sh）'
+    ]
+  },
+  {
     v: '1.1.0',
     d: '2026-10-21',
     items: [
