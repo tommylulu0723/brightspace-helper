@@ -1,0 +1,9 @@
+# 加到你服务器上 Caddy 正在用的那个 Caddyfile 里（和情侣空间那段并列），
+# 把 study.example.com 换成你的子域名，并在域名服务商那里加一条 A 记录指向服务器 IP。
+study.example.com {
+	encode gzip
+	request_body {
+		max_size 10MB
+	}
+	reverse_proxy course-helper:3100
+}

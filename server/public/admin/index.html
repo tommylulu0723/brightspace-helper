@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理后台 · 课程助手</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <form id="loginForm" class="login-card">
+    <div class="login-brand"><span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span><strong>课程助手 · 管理后台</strong></div>
+    <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="username" required></label>
+    <label class="field"><span>密码</span><input name="password" type="password" autocomplete="current-password" required></label>
+    <p id="loginError" class="form-error" role="alert"></p>
+    <button class="btn primary" type="submit">登录</button>
+    <p class="hint">只有管理员账号能进。第一个在插件里注册的人自动是管理员。</p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span><span class="brand-name">管理后台</span></div>
+      <nav class="tabs" role="tablist" aria-label="页面">
+        <button class="tab" role="tab" type="button" data-tab="overview">概览</button>
+        <button class="tab" role="tab" type="button" data-tab="users">用户</button>
+        <button class="tab" role="tab" type="button" data-tab="invites">邀请码</button>
+        <button class="tab" role="tab" type="button" data-tab="settings">设置</button>
+        <button class="tab" role="tab" type="button" data-tab="audit">操作记录</button>
+      </nav>
+      <div class="who"><span id="who"></span><button id="logoutBtn" class="btn small" type="button">退出</button></div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section data-panel="overview">
+      <div class="page-head"><div><h1>概览</h1><p class="subtitle" id="ovSub"></p></div></div>
+      <div class="stats" id="ovStats"></div>
+      <div class="card">
+        <div class="card-head"><h2>最近 14 天每天同步的人数</h2><span class="hint" id="ovChartHint"></span></div>
+        <div id="ovChart" class="chart" role="img" aria-label="最近 14 天每天同步过的用户数"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>当前设置</h2><button class="btn small" type="button" data-goto="settings">去修改</button></div>
+        <div id="ovSettings" class="kv"></div>
+      </div>
+    </section>
+
+    <section data-panel="users" hidden>
+      <div class="page-head"><div><h1>用户</h1><p class="subtitle" id="usersSub"></p></div>
+        <label class="search small-search"><span class="sr">搜索用户</span><input id="userQ" type="search" placeholder="搜索名字或邮箱…"></label></div>
+      <div class="card table-card"><div class="table-wrap"><table class="table" id="usersTable"></table></div></div>
+      <p class="hint">管理员只能看到每个人的统计数字（课程数、事项数、课件数），看不到具体的课程内容。</p>
+    </section>
+
+    <section data-panel="invites" hidden>
+      <div class="page-head"><div><h1>邀请码</h1><p class="subtitle">注册方式为"需要邀请码"时，同学注册要填一个。</p></div></div>
+      <form id="inviteForm" class="card inline-form">
+        <label class="field"><span>可以用几次</span><input name="uses" type="number" min="1" max="200" value="1" required></label>
+        <label class="field grow"><span>备注（给谁的）</span><input name="note" maxlength="60" placeholder="比如：Web Design 同组"></label>
+        <button class="btn primary" type="submit">生成邀请码</button>
+      </form>
+      <div class="card table-card"><div class="table-wrap"><table class="table" id="invitesTable"></table></div></div>
+    </section>
+
+    <section data-panel="settings" hidden>
+      <div class="page-head"><div><h1>设置</h1><p class="subtitle">改完立即生效，插件下次同步（最多 30 分钟）时拿到新设置。</p></div></div>
+      <form id="settingsForm" class="card settings-form">
+        <fieldset>
+          <legend>注册方式</legend>
+          <label class="radio"><input type="radio" name="registration" value="invite"><span><b>需要邀请码</b>（推荐）只有拿到邀请码的同学能注册</span></label>
+          <label class="radio"><input type="radio" name="registration" value="open"><span><b>开放注册</b> 知道服务器地址的人都能注册</span></label>
+          <label class="radio"><input type="radio" name="registration" value="closed"><span><b>关闭注册</b> 不再接受新用户</span></label>
+        </fieldset>
+        <fieldset>
+          <legend>功能开关</legend>
+          <label class="check-row"><input type="checkbox" name="flag_sync"><span><b>云同步</b> 关掉后插件不再上传数据，手机版看不到更新（维护服务器时可以临时关掉）</span></label>
+        </fieldset>
+        <label class="field"><span>公告（显示在插件和手机版顶部，留空不显示）</span><textarea name="announcement" rows="2" maxlength="300"></textarea></label>
+        <div class="form-actions"><button class="btn primary" type="submit">保存设置</button><span id="settingsSaved" class="hint" aria-live="polite"></span></div>
+      </form>
+    </section>
+
+    <section data-panel="audit" hidden>
+      <div class="page-head"><div><h1>操作记录</h1><p class="subtitle">最近 100 条注册、停用、改设置等操作。</p></div></div>
+      <div class="card table-card"><div class="table-wrap"><table class="table" id="auditTable"></table></div></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="dialog" class="dialog"><form method="dialog"><h2 id="dlgTitle"></h2><div id="dlgBody"></div><div class="form-actions"><button class="btn primary" value="ok">知道了</button></div></form></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

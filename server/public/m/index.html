@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#57068C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="课程助手">
+<title>课程助手</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="m.css">
+</head>
+<body>
+<div id="auth" class="auth" hidden>
+  <div class="auth-card">
+    <div class="auth-brand"><span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span><strong>课程助手</strong></div>
+    <p class="auth-sub">登录后查看插件同步过来的截止时间。数据由电脑上的 Chrome 插件从 Brightspace 读取。</p>
+    <form id="loginForm" class="auth-form">
+      <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="username" required></label>
+      <label class="field"><span>密码</span><input name="password" type="password" autocomplete="current-password" required></label>
+      <p id="authError" class="form-error" role="alert"></p>
+      <button class="btn primary" type="submit">登录</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="mtop">
+    <div>
+      <div class="hello" id="hello"></div>
+      <div class="synced" id="synced"></div>
+    </div>
+    <button id="logoutBtn" class="btn small" type="button">退出</button>
+  </header>
+  <div id="announce" class="announce" hidden></div>
+  <div class="mstats" id="stats"></div>
+  <div class="mcourses" id="courses" role="group" aria-label="按课程筛选"></div>
+  <main id="list" class="mlist"></main>
+  <p class="foot">在 Safari 里点"分享 → 添加到主屏幕"，用起来就像 App。<br>勾选完成会同步回电脑上的插件。</p>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<script type="module" src="m.js"></script>
+</body>
+</html>

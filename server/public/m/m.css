@@ -1,0 +1,43 @@
+body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+.auth-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-md); padding: 26px 22px; display: flex; flex-direction: column; gap: 12px; }
+.auth-brand { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.auth-sub { margin: 0; color: var(--muted); font-size: 13.5px; }
+.auth-form { display: flex; flex-direction: column; gap: 12px; }
+.auth-form .btn { min-height: 44px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.field input { font: inherit; font-size: 16px; font-weight: 400; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; min-height: 44px; outline: none; }
+.field input:focus { border-color: var(--accent); }
+.form-error { margin: 0; color: var(--danger); font-size: 13px; min-height: 1em; }
+
+#app { max-width: 640px; margin: 0 auto; padding: 16px 16px 40px; display: flex; flex-direction: column; gap: 14px; }
+.mtop { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-top: 8px; }
+.hello { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+.synced { font-size: 12.5px; color: var(--muted); }
+.announce { padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-text); font-size: 13.5px; font-weight: 500; }
+.mstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mstat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow-sm); }
+.mstat b { display: block; font-size: 22px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.mstat span { font-size: 12px; color: var(--muted); }
+.mstat.warn b { color: var(--warn); }
+.mstat.danger b { color: var(--danger); }
+.mcourses { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.mcourses button { flex: none; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcourses button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.mlist { display: flex; flex-direction: column; gap: 18px; }
+.ghead { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px 4px; }
+.ghead h2 { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.ghead h2.danger { color: var(--danger); }
+.ghead span { font-size: 12px; color: var(--muted); }
+.gcard { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); }
+.mrow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.mrow + .mrow { border-top: 1px solid var(--border-soft); }
+.check { width: 28px; height: 28px; flex: none; border-radius: 50%; cursor: pointer; border: 2px solid color-mix(in srgb, var(--cc) 55%, var(--border)); background: transparent; display: inline-flex; align-items: center; justify-content: center; color: transparent; padding: 0; }
+.check[aria-pressed="true"] { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+.mbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.mtitle { font-weight: 600; font-size: 15px; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.mrow.done .mtitle { color: var(--muted); text-decoration: line-through; }
+.mmeta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 32px 16px; background: var(--surface); border: 1px dashed var(--border); border-radius: 14px; }
+.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 8px; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20; padding: 11px 16px; border-radius: 12px; background: var(--ink); color: var(--bg); font-size: 13.5px; box-shadow: var(--shadow-md); max-width: calc(100% - 32px); }

@@ -1,0 +1,127 @@
+:root {
+  --bg: #F5F4F1;
+  --surface: #FFFFFF;
+  --surface-2: #FAF9F7;
+  --sunken: #EFEDE9;
+  --border: #E5E2DC;
+  --border-soft: #EFEDE8;
+  --ink: #18171A;
+  --ink-2: #3E3B42;
+  --muted: #6A6570;
+  --accent: #57068C;
+  --accent-hover: #46056F;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F3EBF9;
+  --accent-text: #57068C;
+  --warn: #9A4508;
+  --warn-soft: #FDF0E1;
+  --danger: #B42318;
+  --danger-soft: #FDECEA;
+  --ok: #0B6B5F;
+  --ok-soft: #E3F4F0;
+  --neutral-soft: #F0EEEA;
+  --neutral-ink: #45414A;
+  --shadow-sm: 0 1px 2px rgba(24, 23, 26, 0.05);
+  --shadow-md: 0 1px 2px rgba(24, 23, 26, 0.04), 0 6px 20px -8px rgba(24, 23, 26, 0.12);
+  --radius: 14px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111013;
+    --surface: #1A191D;
+    --surface-2: #201F24;
+    --sunken: #0C0B0E;
+    --border: #2E2C33;
+    --border-soft: #26242A;
+    --ink: #EEECF1;
+    --ink-2: #CFCBD6;
+    --muted: #9C97A5;
+    --accent: #B98CEB;
+    --accent-hover: #C9A5F0;
+    --accent-ink: #160A22;
+    --accent-soft: #2A1E38;
+    --accent-text: #C9A5F0;
+    --warn: #F0B06A;
+    --warn-soft: #33240F;
+    --danger: #F49A90;
+    --danger-soft: #3A1A18;
+    --ok: #74D3C2;
+    --ok-soft: #12302B;
+    --neutral-soft: #26242A;
+    --neutral-ink: #D3CFDA;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent-text); }
+
+.sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 36px; padding: 0 14px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  font: inherit; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none;
+  box-shadow: var(--shadow-sm); transition: background .12s, border-color .12s;
+}
+.btn:hover { background: var(--surface-2); border-color: color-mix(in srgb, var(--border) 60%, var(--muted)); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
+.btn.ghost:hover { background: var(--sunken); }
+.btn.small { min-height: 30px; padding: 0 10px; font-size: 13px; border-radius: 8px; }
+.btn.icon { width: 36px; padding: 0; }
+.btn.icon.small { width: 30px; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.chip.danger { background: var(--danger-soft); color: var(--danger); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.neutral { background: var(--neutral-soft); color: var(--neutral-ink); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.accent { background: var(--accent-soft); color: var(--accent-text); }
+
+/* 课程色标签：文字颜色在浅色模式偏深、深色模式偏浅，保证对比度 */
+.course-tag {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 2px 9px 2px 7px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
+  background: color-mix(in srgb, var(--cc) 13%, transparent);
+  color: color-mix(in srgb, var(--cc) 62%, var(--ink));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.course-tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cc); flex: none; }
+
+.logo {
+  width: 30px; height: 30px; border-radius: 9px; background: #57068C;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }

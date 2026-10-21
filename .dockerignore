@@ -1,0 +1,4 @@
+server/data
+**/test
+**/*.zip
+.git
