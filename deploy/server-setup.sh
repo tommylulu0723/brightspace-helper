@@ -86,11 +86,12 @@ awk -v d="$DOMAIN" '
   $1 == d && $2 == "{" { skip = 1; depth = 0 }
   skip { n = gsub(/{/, "{"); m = gsub(/}/, "}"); depth += n - m; if (depth <= 0) { skip = 0 }; next }
   { print }
-' "$CF" > "$CF.tmp" && mv "$CF.tmp" "$CF"
+' "$CF" > "$CF.tmp" && cat "$CF.tmp" > "$CF" && rm -f "$CF.tmp"   # 原地写回：Caddy 容器挂载的是这个文件本身，换成新文件它看不到
 printf '\n%s {\n\tencode gzip\n\trequest_body {\n\t\tmax_size 10MB\n\t}\n\treverse_proxy %s\n}\n' "$DOMAIN" "$UP" >> "$CF"
 ok "已把 $DOMAIN → $UP 写进 $CF（原文件已备份）"
 [ "$UP" = course-helper:3100 ] && docker network connect couple-net caddy 2>/dev/null || true
-if docker exec caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1; then ok "Caddy 已重新加载"; else docker restart caddy >/dev/null && ok "Caddy 已重启"; fi
+# 先确认容器里看到的是新配置再 reload；看不到（旧版脚本换过文件）就重启容器
+if docker exec caddy grep -q "^$DOMAIN" /etc/caddy/Caddyfile 2>/dev/null && docker exec caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1; then ok "Caddy 已重新加载"; else docker restart caddy >/dev/null && ok "Caddy 已重启"; fi
 
 echo
 say "完成 🎉"
