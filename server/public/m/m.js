@@ -46,15 +46,57 @@ function logout(msg = '') {
   $('authError').textContent = msg;
 }
 
+let mode = 'login';
+let info = null;
+function setMode(m) {
+  mode = m;
+  const reg = m === 'register';
+  $('modeLogin').setAttribute('aria-pressed', String(!reg));
+  $('modeReg').setAttribute('aria-pressed', String(reg));
+  for (const el of document.querySelectorAll('.reg-only')) el.hidden = !reg;
+  $('inviteField').hidden = !(reg && info?.registration === 'invite');
+  $('authSub').textContent = reg ? '注册后，在电脑上的课程助手插件里登录同一个账号，插件会用 Brightspace 核对一次姓名，通过后就能用了。' : '用课程助手账号登录，查看截止时间和今日计划。';
+  $('pwLabel').textContent = reg ? '密码（至少 8 位）' : '密码';
+  document.querySelector('#loginForm input[name=password]').autocomplete = reg ? 'new-password' : 'current-password';
+  $('authBtn').textContent = reg ? '注册' : '登录';
+  $('authError').textContent = '';
+  if (reg && !info) api('GET', '/api/info').then((x) => { info = x; setMode(mode); }).catch(() => {});
+}
+$('modeLogin').addEventListener('click', () => setMode('login'));
+$('modeReg').addEventListener('click', () => setMode('register'));
+
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
+  const btn = $('authBtn');
+  btn.disabled = true;
   try {
+    if (mode === 'register') {
+      if (!String(f.get('firstName')).trim() || !String(f.get('lastName')).trim()) throw new Error('First name 和 Last name 都要填');
+      const r = await api('POST', '/api/auth/register', { firstName: f.get('firstName'), lastName: f.get('lastName'), email: f.get('email'), password: f.get('password'), invite: f.get('invite') });
+      token = r.token;
+      try { localStorage.setItem(KEY, token); } catch { /* ignore */ }
+      e.target.hidden = true;
+      document.querySelector('.auth-card .seg').hidden = true;
+      $('authSub').hidden = true;
+      $('regDone').hidden = false;
+      $('regDone').replaceChildren(
+        h('strong', {}, `注册成功，${r.user.firstName}！${r.user.role === 'admin' ? '你是第一个注册的，已经是管理员。' : ''}`),
+        h('p', {}, '最后一步：在电脑的 Chrome 里打开课程助手插件，用这个邮箱和密码登录。插件会读取 Brightspace 上的姓名核对，通过后这里就能看到你的截止时间。'),
+        r.user.role === 'admin' ? h('a', { class: 'btn', href: '/admin/' }, '打开管理后台') : null,
+        h('button', { type: 'button', class: 'btn primary', onClick: () => start() }, '我已经在插件里登录了，刷新'));
+      return;
+    }
     const r = await api('POST', '/api/auth/login', { email: f.get('email'), password: f.get('password') });
     token = r.token;
     try { localStorage.setItem(KEY, token); } catch { /* ignore */ }
     start();
-  } catch (err) { $('authError').textContent = err.message; }
+  } catch (err) {
+    $('authError').textContent = err.message;
+    if (/邀请码/.test(err.message)) $('inviteField').hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
 });
 $('logoutBtn').addEventListener('click', async () => { await api('POST', '/api/auth/logout').catch(() => {}); logout(); });
 

@@ -18,13 +18,25 @@
 <div id="auth" class="auth" hidden>
   <div class="auth-card">
     <div class="auth-brand"><span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span><strong>课程助手</strong></div>
-    <p class="auth-sub">用课程助手账号登录，查看截止时间和今日计划。数据由电脑上的 Chrome 插件从 Brightspace 读取。<br>还没有账号？注册要在电脑上的课程助手插件里完成（需要用 Brightspace 核对姓名），注册好后回来这里登录。</p>
+    <div class="seg" role="group" aria-label="登录或注册">
+      <button type="button" id="modeLogin" aria-pressed="true">登录</button>
+      <button type="button" id="modeReg" aria-pressed="false">注册</button>
+    </div>
+    <p class="auth-sub" id="authSub">用课程助手账号登录，查看截止时间和今日计划。</p>
     <form id="loginForm" class="auth-form">
+      <div class="name-row reg-only" hidden>
+        <label class="field"><span>First name</span><input name="firstName" autocomplete="given-name"></label>
+        <label class="field"><span>Last name</span><input name="lastName" autocomplete="family-name"></label>
+      </div>
+      <p class="hint reg-only" hidden>必须和 Brightspace 上的姓名一模一样（英文名、拼法都要一致），不一致的话注册了也用不了。</p>
       <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="username" required></label>
-      <label class="field"><span>密码</span><input name="password" type="password" autocomplete="current-password" required></label>
+      <p class="hint reg-only" hidden>截止提醒会发到这个邮箱（截止前 24 小时和 3 小时），也用它登录。</p>
+      <label class="field"><span id="pwLabel">密码</span><input name="password" type="password" autocomplete="current-password" required></label>
+      <label class="field reg-only" id="inviteField" hidden><span>邀请码</span><input name="invite" autocomplete="off" placeholder="找管理员要"></label>
       <p id="authError" class="form-error" role="alert"></p>
-      <button class="btn primary" type="submit">登录</button>
+      <button class="btn primary" type="submit" id="authBtn">登录</button>
     </form>
+    <div id="regDone" class="reg-done" hidden></div>
   </div>
 </div>
 

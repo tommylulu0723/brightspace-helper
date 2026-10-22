@@ -51,3 +51,13 @@ body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 .mremind { margin: 18px 0 0; padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); font-size: 13.5px; display: flex; flex-direction: column; gap: 10px; }
 .mremind span { color: var(--muted); }
 .mremind .mcourses { padding: 0; margin: 0; }
+
+.auth-card .seg { display: flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--sunken); align-self: flex-start; }
+.auth-card .seg button { border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); padding: 6px 16px; border-radius: 8px; cursor: pointer; }
+.auth-card .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.auth-form .hint { margin: -6px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.reg-done { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.reg-done p { margin: 0; color: var(--ink-2); line-height: 1.6; }
+.reg-done .btn { justify-content: center; min-height: 42px; }
+.name-row .field { min-width: 0; } .name-row input { width: 100%; min-width: 0; box-sizing: border-box; }
