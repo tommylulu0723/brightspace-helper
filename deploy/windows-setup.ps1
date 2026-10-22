@@ -81,10 +81,20 @@ $every = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -Repetition
 $logon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -Hidden
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
+# 已经装过：先删掉旧任务再重建。旧任务如果是用"管理员"窗口建的，普通窗口删不掉，这时保留旧任务（它照样每分钟运行）
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($every, $logon) -Settings $settings -Principal $principal -Description '每分钟从 GitHub 拉取课程助手的新版本' | Out-Null
-Start-ScheduledTask -TaskName $TaskName
-Ok '每 1 分钟自动检查更新（开机登录后也会自动运行）'
+if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+  Ok '每 1 分钟自动检查更新：之前已经设置好了，保留原来的任务'
+} else {
+  try {
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($every, $logon) -Settings $settings -Principal $principal -Description '每分钟从 GitHub 拉取课程助手的新版本' -ErrorAction Stop | Out-Null
+    Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Ok '每 1 分钟自动检查更新（开机登录后也会自动运行）'
+  } catch {
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { Ok '每 1 分钟自动检查更新：之前已经设置好了，保留原来的任务' }
+    else { Fail "设置自动更新任务失败：$_" }
+  }
+}
 
 $ExtDir = Join-Path $Dir 'extension'
 try { Set-Clipboard -Value $ExtDir } catch { }
