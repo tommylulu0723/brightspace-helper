@@ -78,14 +78,18 @@ if [ -z "$CF" ]; then
 fi
 [ -n "$CF" ] && [ -f "$CF" ] || fail "找不到 Caddy 用的 Caddyfile，把 docker inspect caddy 的输出发给开发者"
 
-if grep -q "^$DOMAIN" "$CF"; then
-  ok "Caddyfile 里已经有 $DOMAIN"
-else
-  cp "$CF" "$CF.bak-$(date +%s)"
-  printf '\n%s {\n\tencode gzip\n\trequest_body {\n\t\tmax_size 10MB\n\t}\n\treverse_proxy course-helper:3100\n}\n' "$DOMAIN" >> "$CF"
-  ok "已把 $DOMAIN 加到 $CF（原文件已备份）"
-fi
-docker network connect couple-net caddy 2>/dev/null || true
+# Caddy 用 --network host 运行时找不到容器名，只能转发到本机端口
+if [ "$(docker inspect caddy -f '{{.HostConfig.NetworkMode}}')" = "host" ]; then UP=127.0.0.1:3100; else UP=course-helper:3100; fi
+cp "$CF" "$CF.bak-$(date +%s)"
+# 删掉旧的同名配置块（可以重复运行），再加上新的
+awk -v d="$DOMAIN" '
+  $1 == d && $2 == "{" { skip = 1; depth = 0 }
+  skip { n = gsub(/{/, "{"); m = gsub(/}/, "}"); depth += n - m; if (depth <= 0) { skip = 0 }; next }
+  { print }
+' "$CF" > "$CF.tmp" && mv "$CF.tmp" "$CF"
+printf '\n%s {\n\tencode gzip\n\trequest_body {\n\t\tmax_size 10MB\n\t}\n\treverse_proxy %s\n}\n' "$DOMAIN" "$UP" >> "$CF"
+ok "已把 $DOMAIN → $UP 写进 $CF（原文件已备份）"
+[ "$UP" = course-helper:3100 ] && docker network connect couple-net caddy 2>/dev/null || true
 if docker exec caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1; then ok "Caddy 已重新加载"; else docker restart caddy >/dev/null && ok "Caddy 已重启"; fi
 
 echo
