@@ -8,6 +8,10 @@ Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { Add-Type -Namespace Win -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'; [Win.Dpi]::SetProcessDPIAware() | Out-Null } catch { }
 
+$g = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero); $S = [math]::Max(1, $g.DpiX / 96); $g.Dispose()
+function P($x, $y) { New-Object System.Drawing.Point([int]($x * $S), [int]($y * $S)) }
+function Z($w, $h) { New-Object System.Drawing.Size([int]($w * $S), [int]($h * $S)) }
+
 $Repo = 'tommylulu0723/brightspace-helper'
 $Site = 'https://ddl.tommyxiaoshu.cn'
 $LogDir = Join-Path $env:LOCALAPPDATA 'CourseHelper'
@@ -44,9 +48,9 @@ $InitialDir = if ($Existing) { $Existing } else { Default-Dir }
 
 # ---------- 窗口 ----------
 $form = New-Object System.Windows.Forms.Form
-$form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96)
-$form.AutoScaleMode = 'Dpi'
-$form.ClientSize = New-Object System.Drawing.Size(560, 400)
+# 高分屏（125% / 150% 缩放）：自己按比例算位置和大小（Windows 的自动缩放在脚本里不可靠，会出现字变大、窗口没变大、按钮被挤出去）
+$form.AutoScaleMode = 'None'
+$form.ClientSize = Z 600 460
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
@@ -54,81 +58,81 @@ $form.Font = $Font
 $form.BackColor = [System.Drawing.Color]::White
 
 $header = New-Object System.Windows.Forms.Panel
-$header.Dock = 'Top'; $header.Height = 70; $header.BackColor = $Purple
+$header.Dock = 'Top'; $header.Height = [int](70 * $S); $header.BackColor = $Purple
 $hTitle = New-Object System.Windows.Forms.Label
-$hTitle.ForeColor = 'White'; $hTitle.Font = $FontTitle; $hTitle.AutoSize = $true; $hTitle.Location = '24,10'
+$hTitle.ForeColor = 'White'; $hTitle.Font = $FontTitle; $hTitle.AutoSize = $true; $hTitle.Location = (P 24 10)
 $hSub = New-Object System.Windows.Forms.Label
-$hSub.ForeColor = [System.Drawing.Color]::FromArgb(225, 210, 240); $hSub.AutoSize = $true; $hSub.Location = '26,42'
+$hSub.ForeColor = [System.Drawing.Color]::FromArgb(225, 210, 240); $hSub.AutoSize = $true; $hSub.Location = (P 26 42)
 $header.Controls.AddRange(@($hTitle, $hSub))
 $form.Controls.Add($header)
 
-function New-Page { $p = New-Object System.Windows.Forms.Panel; $p.Location = '0,70'; $p.Size = '560,330'; $p.Visible = $false; $form.Controls.Add($p); return $p }
+function New-Page { $p = New-Object System.Windows.Forms.Panel; $p.Location = (P 0 70); $p.Size = (Z 600 390); $p.Visible = $false; $p.AutoScroll = $true; $form.Controls.Add($p); return $p }
 function New-Label($parent, $text, $x, $y, $w = 510, $h = 0, $font = $Font, $color = $null) {
   $l = New-Object System.Windows.Forms.Label
-  $l.Text = $text; $l.Location = "$x,$y"; $l.Font = $font
-  if ($h) { $l.Size = "$w,$h" } else { $l.MaximumSize = "$w,0"; $l.AutoSize = $true }
+  $l.Text = $text; $l.Location = (P $x $y); $l.Font = $font
+  if ($h) { $l.Size = (Z $w $h) } else { $l.MaximumSize = (Z $w 0); $l.AutoSize = $true }
   if ($color) { $l.ForeColor = $color }
   $parent.Controls.Add($l); return $l
 }
 function New-Button($parent, $text, $x, $y, $w = 100, $primary = $false, $h = 32) {
   $b = New-Object System.Windows.Forms.Button
-  $b.Text = $text; $b.Location = "$x,$y"; $b.Size = "$w,$h"
+  $b.Text = $text; $b.Location = (P $x $y); $b.Size = (Z $w $h)
   if ($primary) { $b.BackColor = $Purple; $b.ForeColor = 'White'; $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.Font = $FontBold }
   $parent.Controls.Add($b); return $b
 }
 
 # ---------- 第 0 页：选择语言 ----------
 $p0 = New-Page
-New-Label $p0 "请选择语言`nPlease choose your language" 24 22 510 0 $FontBig | Out-Null
-New-Label $p0 "安装程序和课程助手都会使用这个语言，以后可以在课程助手的设置里切换。`nThe installer and Course Helper will use this language. You can change it later in Settings." 24 80 510 0 $Font $Muted | Out-Null
-$zhBtn = New-Button $p0 '中文' 24 150 248 ($script:Lang -eq 'zh') 64
-$enBtn = New-Button $p0 'English' 284 150 248 ($script:Lang -eq 'en') 64
+New-Label $p0 "请选择语言`nPlease choose your language" 28 26 544 0 $FontBig | Out-Null
+New-Label $p0 "安装程序和课程助手都会使用这个语言，以后可以在课程助手的设置里切换。`nThe installer and Course Helper will use this language. You can change it later in Settings." 28 96 544 0 $Font $Muted | Out-Null
+$zhBtn = New-Button $p0 '中文' 28 200 266 ($script:Lang -eq 'zh') 64
+$enBtn = New-Button $p0 'English' 306 200 266 ($script:Lang -eq 'en') 64
 $zhBtn.Font = $FontBig; $enBtn.Font = $FontBig
 
 # ---------- 第 1 页：选择安装位置 ----------
 $p1 = New-Page
-$p1Title = New-Label $p1 '' 24 18 510 0 $FontBold
-$p1Note = New-Label $p1 '' 24 44 510 0 $Font $Muted
+$p1Title = New-Label $p1 '' 24 18 552 0 $FontBold
+$p1Note = New-Label $p1 '' 24 44 552 0 $Font $Muted
 $pathBox = New-Object System.Windows.Forms.TextBox
-$pathBox.Location = '24,96'; $pathBox.Size = '400,28'; $pathBox.Text = $InitialDir
+$pathBox.Location = (P 24 104); $pathBox.Size = (Z 440 28); $pathBox.Text = $InitialDir
 $p1.Controls.Add($pathBox)
-$browse = New-Button $p1 '' 432 94 100
-$spaceLbl = New-Label $p1 '' 24 132 510 0 $Font $Muted
+$browse = New-Button $p1 '' 472 102 104
+$spaceLbl = New-Label $p1 '' 24 142 552 0 $Font $Muted
 $box = New-Object System.Windows.Forms.GroupBox
-$box.Location = '24,168'; $box.Size = '508,96'
-$boxText = New-Label $box '' 14 24 480 0
+$box.Location = (P 24 186); $box.Size = (Z 552 120)
+$boxText = New-Label $box '' 14 26 520 0
 $p1.Controls.Add($box)
-$back1 = New-Button $p1 '' 24 282 96
-$cancel1 = New-Button $p1 '' 330 282 96
-$install = New-Button $p1 '' 436 282 96 $true
+$back1 = New-Button $p1 '' 24 330 100
+$cancel1 = New-Button $p1 '' 364 330 100
+$install = New-Button $p1 '' 476 330 100 $true
 
 # ---------- 第 2 页：安装中 ----------
 $p2 = New-Page
-$p2Title = New-Label $p2 '' 24 18 510 0 $FontBold
-$p2Note = New-Label $p2 '' 24 44 510 0 $Font $Muted
+$p2Title = New-Label $p2 '' 24 18 552 0 $FontBold
+$p2Note = New-Label $p2 '' 24 44 552 0 $Font $Muted
 $bar = New-Object System.Windows.Forms.ProgressBar
-$bar.Location = '24,78'; $bar.Size = '508,14'; $bar.Style = 'Marquee'; $bar.MarqueeAnimationSpeed = 25
+$bar.Location = (P 24 92); $bar.Size = (Z 552 14); $bar.Style = 'Marquee'; $bar.MarqueeAnimationSpeed = 25
 $p2.Controls.Add($bar)
 $log = New-Object System.Windows.Forms.TextBox
-$log.Location = '24,104'; $log.Size = '508,166'; $log.Multiline = $true; $log.ReadOnly = $true; $log.ScrollBars = 'Vertical'
+$log.Location = (P 24 118); $log.Size = (Z 552 196); $log.Multiline = $true; $log.ReadOnly = $true; $log.ScrollBars = 'Vertical'
 $log.BackColor = [System.Drawing.Color]::FromArgb(247, 246, 249); $log.Font = New-Object System.Drawing.Font('Consolas', 9)
 $p2.Controls.Add($log)
-$back2 = New-Button $p2 '' 330 282 96
+$back2 = New-Button $p2 '' 364 330 100
 $back2.Visible = $false
-$close2 = New-Button $p2 '' 436 282 96
+$close2 = New-Button $p2 '' 476 330 100
 $close2.Enabled = $false
 
 # ---------- 第 3 页：完成 ----------
 $p3 = New-Page
-$p3Title = New-Label $p3 '' 24 18 510 0 $FontBold ([System.Drawing.Color]::FromArgb(22, 120, 60))
-$steps = New-Label $p3 '' 24 50 510 0
+$p3Title = New-Label $p3 '' 24 18 552 0 $FontBold ([System.Drawing.Color]::FromArgb(22, 120, 60))
+$steps = New-Label $p3 '' 24 54 552 0
 $extLbl = New-Object System.Windows.Forms.TextBox
-$extLbl.Location = '24,178'; $extLbl.Size = '508,28'; $extLbl.ReadOnly = $true
+$extLbl.Location = (P 24 200); $extLbl.Size = (Z 552 28); $extLbl.ReadOnly = $true
 $p3.Controls.Add($extLbl)
-$p3Note = New-Label $p3 '' 24 214 510 0 $Font $Muted
-$copyBtn = New-Button $p3 '' 24 282 110
-$openGuide = New-Button $p3 '' 144 282 240 $true
-$done = New-Button $p3 '' 436 282 96
+$p3Note = New-Label $p3 '' 24 240 552 0 $Font $Muted
+$copyBtn = New-Button $p3 '' 24 330 120
+$openGuide = New-Button $p3 '' 154 330 260 $true
+$done = New-Button $p3 '' 476 330 100
 
 function Apply-Lang {
   $form.Text = L '课程助手 安装' 'Course Helper Setup'
