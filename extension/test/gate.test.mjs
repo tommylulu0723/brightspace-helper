@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { gateState } from '../src/lib/gate.js';
+import { gateState, isBlocking } from '../src/lib/gate.js';
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
 const user = (verify) => ({ token: 'x', user: { email: 'a@nyu.edu', name: 'Tommy Lu', verify } });
@@ -24,5 +24,9 @@ t('通过后换了别人的 Brightspace 账号登录 → 马上锁住（不用�
   const g = gateState({ requireLogin: true, cloud: user({ status: 'ok', bsId: '42' }), data: { user: { ...bs, id: '99' } } });
   assert.equal(g.state, 'mismatch');
   assert.match(g.reason, /不是同一个人/);
+});
+t('只有没登录、姓名不一致、账号被占用才挡住；读取 / 核对中照常进入', () => {
+  assert.ok(isBlocking('login') && isBlocking('mismatch') && isBlocking('taken'));
+  assert.ok(!isBlocking('needBrightspace') && !isBlocking('checking') && !isBlocking('ok'));
 });
 console.log(`全部 ${n} 个测试通过`);

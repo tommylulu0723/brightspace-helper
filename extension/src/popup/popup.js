@@ -3,7 +3,7 @@ import { BASE_URL } from '../lib/api.js';
 import { createStore } from '../store.js';
 import { buildPlan } from '../lib/plan.js';
 import { unreadCount } from '../lib/feed.js';
-import { gateState } from '../lib/gate.js';
+import { gateState, isBlocking } from '../lib/gate.js';
 import { REQUIRE_LOGIN } from '../config.js';
 import { loadLang } from '../lang.js';
 import { translatePage, getLang, setLang } from '../lib/i18n.js';
@@ -32,7 +32,7 @@ async function render() {
   const now = new Date();
   const gate = store.demo ? { state: 'ok' } : gateState({ requireLogin: REQUIRE_LOGIN, cloud, data });
   document.body.classList.toggle('locked', gate.state !== 'ok');
-  if (gate.state !== 'ok') {
+  if (isBlocking(gate.state)) {
     const msg = {
       login: ['请先登录课程助手', '只有注册并通过 Brightspace 姓名校验的同学才能使用。'],
       needBrightspace: ['还差一步：登录 Brightspace', '课程助手要核对一下 Brightspace 上的姓名。'],

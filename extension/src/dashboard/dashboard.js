@@ -13,7 +13,7 @@ import { buildPlan } from '../lib/plan.js';
 import { buildFeed, FEED_FILTERS } from '../lib/feed.js';
 import { UPDATE_KINDS } from '../lib/changes.js';
 import { averagePct, gradeTone } from '../lib/extras.js';
-import { gateState } from '../lib/gate.js';
+import { gateState, isBlocking } from '../lib/gate.js';
 import { renderGate, resetGate } from './gate.js';
 import { REQUIRE_LOGIN } from '../config.js';
 import { loadLang } from '../lang.js';
@@ -74,7 +74,8 @@ function render() {
   const now = new Date();
   // 要求登录时：没登录 / 没通过 Brightspace 姓名校验，只显示登录页
   const gate = store.demo ? { state: 'ok' } : gateState({ requireLogin: REQUIRE_LOGIN, cloud: state.cloud, data: state.data });
-  const locked = gate.state !== 'ok';
+  const locked = isBlocking(gate.state);
+  ui.gate = gate;
   document.body.classList.toggle('locked', locked);
   $('gate').hidden = !locked;
   if (locked) {
@@ -131,10 +132,31 @@ function renderTop(now) {
   btn.setAttribute('aria-pressed', String(ui.view === 'settings'));
 }
 
+let verifyTried = false;
 function renderBanner() {
   const b = $('banner');
   const st = state.status || {};
-  if (st.state !== 'error') { b.hidden = true; fill(b, ); }
+  const g = ui.gate || { state: 'ok' };
+  const syncing = st.state === 'syncing';
+  // 登录了课程助手、但还没完成 Brightspace 姓名核对：照常使用，顶部提示进度
+  if (g.state === 'needBrightspace' || g.state === 'checking') {
+    const bsAuth = st.state === 'error' && st.error?.code === 'AUTH_REQUIRED';
+    const vErr = state.cloud?.verifyError;
+    const bs = state.data?.user;
+    if (g.state === 'checking' && !verifyTried && !vErr) { verifyTried = true; store.verify(); }
+    b.className = `banner ${bsAuth || vErr ? 'error' : 'info'}`;
+    if (g.state === 'needBrightspace' && bsAuth) {
+      fill(b, h('span', {}, h('b', {}, '还差一步：登录 Brightspace'), ' · 登录后课程助手会自动读取你的课程，并核对姓名。'),
+        h('a', { class: 'btn small primary', href: `${BASE_URL}/d2l/home`, target: '_blank', rel: 'noopener' }, '打开 Brightspace 登录'));
+    } else if (g.state === 'needBrightspace') {
+      fill(b, h('span', {}, syncing ? '正在读取 Brightspace…' : '还没读取 Brightspace。确认 Chrome 里已经登录 Brightspace，然后点"读取"。'),
+        syncing ? null : h('button', { type: 'button', class: 'btn small', onClick: () => doSync() }, '读取'));
+    } else {
+      fill(b, h('span', {}, vErr ? `核对姓名失败：${vErr}` : `正在核对姓名（Brightspace：${bs?.firstName || ''} ${bs?.lastName || ''}）…`),
+        h('button', { type: 'button', class: 'btn small', onClick: async (e) => { e.currentTarget.disabled = true; await store.verify(); } }, '重试'));
+    }
+    b.hidden = false;
+  } else if (st.state !== 'error') { b.hidden = true; fill(b, ); }
   else {
     b.className = 'banner error';
     if (st.error?.code === 'AUTH_REQUIRED') {

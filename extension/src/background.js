@@ -7,7 +7,7 @@ import { diffSync, mergeUpdates, describeUpdate } from './lib/changes.js';
 import { buildPlan } from './lib/plan.js';
 import { unreadCount } from './lib/feed.js';
 import { VERSION_NOTES, REQUIRE_LOGIN } from './config.js';
-import { gateState } from './lib/gate.js';
+import { gateState, isBlocking } from './lib/gate.js';
 import { tr } from './lib/i18n.js';
 import { loadLang } from './lang.js';
 import { parseFirstNotes } from './lib/selfupdate.js';
@@ -151,7 +151,7 @@ async function refreshBadge() {
   if (REQUIRE_LOGIN) {
     const { cloud: c } = await chrome.storage.local.get('cloud');
     const g = gateState({ requireLogin: true, cloud: c, data });
-    if (g.state !== 'ok') {
+    if (isBlocking(g.state)) {
       await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
       await chrome.action.setBadgeText({ text: '!' });
       await setTitleTr({ title: g.state === 'login' ? '课程助手：请先登录' : '课程助手：需要完成 Brightspace 姓名校验' });
@@ -191,7 +191,7 @@ async function refreshBadge() {
 async function locked() {
   if (!REQUIRE_LOGIN) return false;
   const { cloud: c, data } = await chrome.storage.local.get(['cloud', 'data']);
-  return gateState({ requireLogin: true, cloud: c, data }).state !== 'ok';
+  return isBlocking(gateState({ requireLogin: true, cloud: c, data }).state);
 }
 
 // 把 Brightspace 上的姓名发给服务器核对（登录后、每次同步后都做一次）
@@ -201,13 +201,17 @@ async function verifyIdentity() {
   try {
     const r = await cloud.verify(c.server, c.token, { firstName: data.user.firstName, lastName: data.user.lastName, identifier: data.user.id, uniqueName: data.user.uniqueName });
     const { cloud: now } = await chrome.storage.local.get('cloud');
-    if (now?.token === c.token) await chrome.storage.local.set({ cloud: { ...now, user: r.user, error: null } });
+    if (now?.token === c.token) await chrome.storage.local.set({ cloud: { ...now, user: r.user, error: null, verifyError: null } });
     return r.user.verify;
   } catch (e) {
     if (e instanceof CloudError && e.status === 401) {
       await chrome.storage.local.set({ cloud: { ...c, token: null, user: null, error: e.code === 'DISABLED' ? '账号已被管理员停用' : '登录已过期，请重新登录' } });
+    } else {
+      // 连不上服务器等：沿用上次的结果，不把人锁在外面，但把原因显示出来
+      const { cloud: now } = await chrome.storage.local.get('cloud');
+      if (now?.token === c.token) await chrome.storage.local.set({ cloud: { ...now, verifyError: e.message || String(e) } });
     }
-    return null; // 连不上服务器时沿用上次的结果，不把人锁在外面
+    return null;
   }
 }
 
@@ -489,6 +493,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendResponse({ ok: true });
     setTimeout(() => chrome.runtime.reload(), 200);
     return false;
+  }
+  if (msg && msg.type === 'verify') {
+    // 还没读到 Brightspace 姓名就先同步一次（同步完会自动核对），读到了就直接核对
+    chrome.storage.local.get('data').then(async ({ data }) => {
+      if (!data?.user?.firstName && !data?.user?.lastName) { await syncNow('verify'); sendResponse({ ok: true }); return; }
+      const v = await verifyIdentity();
+      sendResponse({ ok: !!v, verify: v });
+    });
+    return true;
   }
   if (msg && msg.type === 'checkUpdate') {
     checkSelfUpdate().then((p) => sendResponse({ pending: p }));

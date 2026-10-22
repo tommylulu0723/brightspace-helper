@@ -246,6 +246,10 @@ const D = [
   ['{}（{}）· {}', '{0} ({1}) · {2}'], ['• {}', '• {}'],
   [' · {} 条新的', ' · {} new'], ['{} 条新的', '{} new'],
   ['· {}', '· {}'],
+  [' · 登录后课程助手会自动读取你的课程，并核对姓名。', ' · Once you log in, Course Helper reads your courses and checks your name automatically.'],
+  ['正在读取 Brightspace…', 'Reading Brightspace…'], ['读取', 'Read'],
+  ['还没读取 Brightspace。确认 Chrome 里已经登录 Brightspace，然后点"读取"。', 'Brightspace hasn\'t been read yet. Make sure you\'re logged in to Brightspace in Chrome, then click "Read".'],
+  ['核对姓名失败：{}', 'Name check failed: {}'], ['正在核对姓名（Brightspace：{} {}）…', 'Checking your name (Brightspace: {0} {1})…'],
 ];
 
 // ---------- 编译词典 ----------

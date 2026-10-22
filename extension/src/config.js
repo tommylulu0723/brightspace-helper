@@ -7,6 +7,18 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.4.1',
+    d: '2026-10-22',
+    items: [
+      '登录后直接进入插件：读取 Brightspace 和核对姓名在后台自动完成，顶部显示进度；没登录 Brightspace 时提示去登录，登录完自动继续',
+      '只有姓名不一致或账号被别人绑定才会锁住；核对失败会显示原因，可以点"重试"'
+    ],
+    en: [
+      'You go straight into the extension after logging in: reading Brightspace and the name check happen in the background, with progress shown at the top; if you\'re not logged in to Brightspace you\'re prompted, and it continues automatically afterwards',
+      'Only a name mismatch or an account linked by someone else locks the extension; if the check fails you see why and can click "Retry"'
+    ]
+  },
+  {
     v: '1.4.0',
     d: '2026-10-22',
     items: [

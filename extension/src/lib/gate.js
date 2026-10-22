@@ -20,3 +20,7 @@ export function gateState({ requireLogin, cloud, data }) {
   if (!bs || !(bs.firstName || bs.lastName)) return { state: 'needBrightspace' };
   return { state: 'checking' };
 }
+
+// 只有这几种情况挡住整个插件；"还没读到 Brightspace / 正在核对"时照常进入，在顶部提示
+export const BLOCKING = new Set(['login', 'mismatch', 'taken']);
+export const isBlocking = (state) => BLOCKING.has(state);
