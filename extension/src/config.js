@@ -1,11 +1,19 @@
 // 发给同学之前，把这里改成你服务器的地址（例如 'https://study.example.com'），
 // 同学装好插件后登录页就会自动填好，不用每个人手动输入。
-export const DEFAULT_SERVER = '';
+export const DEFAULT_SERVER = 'https://ddl.tommyxiaoshu.cn';
 
 // 设置了服务器地址时，必须注册 / 登录、并且姓名和 Brightspace 一致才能用
 export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
+  {
+    v: '1.3.1',
+    d: '2026-10-22',
+    items: [
+      '账号系统上线：服务器 ddl.tommyxiaoshu.cn。第一次打开需要注册（First / Last name 要和 Brightspace 一致），通过姓名校验后就能用',
+      '登录后可以在 设置 → 账号 里开关截止提醒邮件，手机上打开 ddl.tommyxiaoshu.cn/m/ 查看'
+    ]
+  },
   {
     v: '1.3.0',
     d: '2026-10-22',
