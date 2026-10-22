@@ -654,7 +654,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       const ext = path.extname(file).toLowerCase();
       res.writeHead(200, {
         'content-type': MIME[ext] || 'application/octet-stream',
-        'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
+        'cache-control': ['.html', '.js', '.css', '.webmanifest'].includes(ext) ? 'no-cache' : 'public, max-age=86400', // 页面和脚本每次都检查更新，避免新页面配旧脚本
         'x-content-type-options': 'nosniff',
         'referrer-policy': 'no-referrer',
         ...(ext === '.html' ? { 'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'" } : {})

@@ -51,19 +51,30 @@ let info = null;
 function setMode(m) {
   mode = m;
   const reg = m === 'register';
-  $('modeLogin').setAttribute('aria-pressed', String(!reg));
-  $('modeReg').setAttribute('aria-pressed', String(reg));
+  $('modeLogin').setAttribute('aria-selected', String(!reg));
+  $('modeReg').setAttribute('aria-selected', String(reg));
   for (const el of document.querySelectorAll('.reg-only')) el.hidden = !reg;
   $('inviteField').hidden = !(reg && info?.registration === 'invite');
-  $('authSub').textContent = reg ? '注册后，在电脑上的课程助手插件里登录同一个账号，插件会用 Brightspace 核对一次姓名，通过后就能用了。' : '用课程助手账号登录，查看截止时间和今日计划。';
+  $('authTitle').textContent = reg ? '创建账号' : '欢迎回来';
   $('pwLabel').textContent = reg ? '密码（至少 8 位）' : '密码';
   document.querySelector('#loginForm input[name=password]').autocomplete = reg ? 'new-password' : 'current-password';
   $('authBtn').textContent = reg ? '注册' : '登录';
+  $('switchText').textContent = reg ? '已经有账号了？' : '还没有账号？';
+  $('switchBtn').textContent = reg ? '去登录' : '立即注册';
   $('authError').textContent = '';
-  if (reg && !info) api('GET', '/api/info').then((x) => { info = x; setMode(mode); }).catch(() => {});
+  if (reg && !info) api('GET', '/api/info').then((x) => { info = x; if (mode === 'register') $('inviteField').hidden = x.registration !== 'invite'; }).catch(() => {});
+  (reg ? document.querySelector('input[name=firstName]') : document.querySelector('input[name=email]')).focus({ preventScroll: true });
 }
 $('modeLogin').addEventListener('click', () => setMode('login'));
 $('modeReg').addEventListener('click', () => setMode('register'));
+$('switchBtn').addEventListener('click', () => setMode(mode === 'login' ? 'register' : 'login'));
+$('pwEye').addEventListener('click', () => {
+  const i = document.querySelector('#loginForm input[name=password]');
+  const show = i.type === 'password';
+  i.type = show ? 'text' : 'password';
+  $('pwEye').textContent = show ? '隐藏' : '显示';
+});
+if (location.hash === '#register') setTimeout(() => setMode('register'));
 
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -72,13 +83,13 @@ $('loginForm').addEventListener('submit', async (e) => {
   btn.disabled = true;
   try {
     if (mode === 'register') {
-      if (!String(f.get('firstName')).trim() || !String(f.get('lastName')).trim()) throw new Error('First name 和 Last name 都要填');
+      if (!String(f.get('firstName')).trim() || !String(f.get('lastName')).trim()) throw new Error('First name 和 Last name 都要填，并且和 Brightspace 上的一致');
+      if (String(f.get('password')).length < 8) throw new Error('密码至少 8 位');
       const r = await api('POST', '/api/auth/register', { firstName: f.get('firstName'), lastName: f.get('lastName'), email: f.get('email'), password: f.get('password'), invite: f.get('invite') });
       token = r.token;
       try { localStorage.setItem(KEY, token); } catch { /* ignore */ }
       e.target.hidden = true;
-      document.querySelector('.auth-card .seg').hidden = true;
-      $('authSub').hidden = true;
+      document.querySelector('.tabs2').hidden = true;
       $('regDone').hidden = false;
       $('regDone').replaceChildren(
         h('strong', {}, `注册成功，${r.user.firstName}！${r.user.role === 'admin' ? '你是第一个注册的，已经是管理员。' : ''}`),

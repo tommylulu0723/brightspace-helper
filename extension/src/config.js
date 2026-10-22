@@ -7,6 +7,11 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.3.2',
+    d: '2026-10-22',
+    items: ['注册页更醒目地提示：姓名必须和 Brightspace 上完全一致']
+  },
+  {
     v: '1.3.1',
     d: '2026-10-22',
     items: [

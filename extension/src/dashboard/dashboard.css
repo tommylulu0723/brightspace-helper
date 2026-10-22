@@ -452,3 +452,6 @@ body.locked .wrap, body.locked .tabs, body.locked .search, body.locked .sync { d
 .reminder-box { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
 .reminder-head { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
 .reminder-head .muted { font-size: 12.5px; }
+
+.gate-card .tip.warn { display: flex; flex-direction: column; gap: 3px; margin-top: -4px; padding: 11px 13px; border-radius: 12px; background: var(--warn-soft); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+.gate-card .tip.warn b { color: var(--warn); font-size: 13.5px; }

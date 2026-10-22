@@ -42,9 +42,11 @@ function authForm(ctx) {
     reg ? h('div', { class: 'name-row' },
       h('label', { class: 'field' }, h('span', {}, 'First name'), h('input', { name: 'firstName', autocomplete: 'given-name', required: true, value: bs?.firstName || '' })),
       h('label', { class: 'field' }, h('span', {}, 'Last name'), h('input', { name: 'lastName', autocomplete: 'family-name', required: true, value: bs?.lastName || '' }))) : null,
-    reg ? h('p', { class: 'hint tight' }, bs?.firstName
-      ? `必须和 Brightspace 上的姓名一致（你的 Brightspace 显示：${bs.firstName} ${bs.lastName}），不一致的话注册了也用不了。`
-      : '必须和 Brightspace 上的姓名一致（英文名、拼法都要一样），不一致的话注册了也用不了。') : null,
+    reg ? h('div', { class: 'tip warn', role: 'note' },
+      h('b', {}, '⚠ 姓名必须和 Brightspace 上完全一致'),
+      h('span', {}, bs?.firstName
+        ? `你的 Brightspace 显示的是：${bs.firstName} ${bs.lastName}。英文名、拼写和顺序都要一样，不一致的话注册后也无法使用。`
+        : '包括英文名、拼写和顺序。插件会自动核对，不一致的话注册后也无法使用。')) : null,
     h('label', { class: 'field' }, h('span', {}, '邮箱'), h('input', { name: 'email', type: 'email', autocomplete: 'username', required: true })),
     reg ? h('p', { class: 'hint tight' }, '截止提醒会发到这个邮箱（截止前 24 小时和 3 小时），也用它登录。') : null,
     h('label', { class: 'field' }, h('span', {}, reg ? '密码（至少 8 位）' : '密码'), h('input', { name: 'password', type: 'password', autocomplete: reg ? 'new-password' : 'current-password', required: true })),

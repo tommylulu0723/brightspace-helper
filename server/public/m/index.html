@@ -12,29 +12,42 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="/shared.css">
-<link rel="stylesheet" href="m.css">
+<link rel="stylesheet" href="m.css?v=3">
 </head>
 <body>
 <div id="auth" class="auth" hidden>
   <div class="auth-card">
-    <div class="auth-brand"><span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span><strong>课程助手</strong></div>
-    <div class="seg" role="group" aria-label="登录或注册">
-      <button type="button" id="modeLogin" aria-pressed="true">登录</button>
-      <button type="button" id="modeReg" aria-pressed="false">注册</button>
+    <div class="auth-brand">
+      <span class="auth-logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span>
+      <div><strong>课程助手</strong><span>NYU Brightspace 截止时间 · 今日计划 · 邮件提醒</span></div>
     </div>
-    <p class="auth-sub" id="authSub">用课程助手账号登录，查看截止时间和今日计划。</p>
-    <form id="loginForm" class="auth-form">
-      <div class="name-row reg-only" hidden>
-        <label class="field"><span>First name</span><input name="firstName" autocomplete="given-name"></label>
-        <label class="field"><span>Last name</span><input name="lastName" autocomplete="family-name"></label>
+
+    <div class="tabs2" role="tablist" aria-label="登录或注册">
+      <button type="button" role="tab" id="modeLogin" aria-selected="true">登录</button>
+      <button type="button" role="tab" id="modeReg" aria-selected="false">注册</button>
+    </div>
+
+    <form id="loginForm" class="auth-form" novalidate>
+      <h1 id="authTitle">欢迎回来</h1>
+      <div class="reg-only" hidden>
+        <div class="name-row">
+          <label class="field"><span>First name</span><input name="firstName" autocomplete="given-name" placeholder="例如 Tommy"></label>
+          <label class="field"><span>Last name</span><input name="lastName" autocomplete="family-name" placeholder="例如 Lu"></label>
+        </div>
+        <div class="tip warn" role="note">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <div><b>姓名必须和 Brightspace 上完全一致</b>包括英文名、拼写和顺序。插件会自动核对，不一致的话注册后也无法使用。</div>
+        </div>
       </div>
-      <p class="hint reg-only" hidden>必须和 Brightspace 上的姓名一模一样（英文名、拼法都要一致），不一致的话注册了也用不了。</p>
-      <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="username" required></label>
-      <p class="hint reg-only" hidden>截止提醒会发到这个邮箱（截止前 24 小时和 3 小时），也用它登录。</p>
-      <label class="field"><span id="pwLabel">密码</span><input name="password" type="password" autocomplete="current-password" required></label>
-      <label class="field reg-only" id="inviteField" hidden><span>邀请码</span><input name="invite" autocomplete="off" placeholder="找管理员要"></label>
+      <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="username" placeholder="you@nyu.edu" required></label>
+      <p class="field-hint reg-only" hidden>截止提醒会发到这个邮箱（截止前 24 小时和 3 小时），登录也用它。</p>
+      <label class="field"><span id="pwLabel">密码</span>
+        <span class="pw-wrap"><input name="password" type="password" autocomplete="current-password" required><button type="button" class="pw-eye" id="pwEye" aria-label="显示密码">显示</button></span>
+      </label>
+      <label class="field" id="inviteField" hidden><span>邀请码</span><input name="invite" autocomplete="off" placeholder="找管理员要，例如 ABCD-2345"></label>
       <p id="authError" class="form-error" role="alert"></p>
-      <button class="btn primary" type="submit" id="authBtn">登录</button>
+      <button class="btn primary big" type="submit" id="authBtn">登录</button>
+      <p class="switch-line"><span id="switchText">还没有账号？</span><button type="button" class="link" id="switchBtn">立即注册</button></p>
     </form>
     <div id="regDone" class="reg-done" hidden></div>
   </div>
@@ -58,6 +71,6 @@
   <p class="foot" id="installTip">iPhone / iPad：在 Safari 里点"分享"→"添加到主屏幕"，用起来就像 App。<br>Android：Chrome 菜单 →"添加到主屏幕"。勾选完成会同步回电脑上的插件。</p>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
-<script type="module" src="m.js"></script>
+<script type="module" src="m.js?v=3"></script>
 </body>
 </html>
