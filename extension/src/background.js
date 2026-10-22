@@ -101,7 +101,8 @@ async function checkSelfUpdate() {
   const shown = en && notesEn ? notesEn : notes;
   await chrome.storage.local.set({ pendingUpdate: pending });
 
-  if (settings.autoApplyUpdate) { applyUpdate(); return pending; }
+  // 打开了自动更新，或者还被挡在登录 / 姓名核对页面（这时看不到更新提示，也没什么可打断的）：直接更新
+  if (settings.autoApplyUpdate || (await locked())) { applyUpdate(); return pending; }
   refreshBadge();
   notify(`pending:${disk.version}`, {
     type: 'basic',

@@ -7,6 +7,12 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.5.2',
+    d: '2026-10-22',
+    items: ['还没登录或没通过姓名核对时，有新版本直接自动更新（之前被登录页挡住看不到更新提示）'],
+    en: ['While you\'re still on the login / name-check screen, new versions now install automatically (the update prompt used to be hidden there)']
+  },
+  {
     v: '1.5.1',
     d: '2026-10-22',
     items: [
