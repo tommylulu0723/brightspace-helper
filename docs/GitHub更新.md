@@ -91,7 +91,7 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\windows-set
 | 日志里有 `Authentication failed` | GitHub 登录过期了。在 PowerShell 运行上面"手动拉一次"那行，会重新弹登录窗口 |
 | 日志里有 `Not possible to fast-forward` | 你改过 CourseHelper 文件夹里的文件。运行 `git -C "$env:USERPROFILE\CourseHelper" reset --hard origin/main` |
 | 运行脚本提示"禁止运行脚本" | 确认用的是上面那整行命令（带 `-ExecutionPolicy Bypass`） |
-| 想关掉自动更新 | `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\CourseHelper\deploy\windows-uninstall.ps1"` |
+| 想卸载 | 双击 `install/Windows-卸载课程助手.bat`（Mac：`install/Mac-卸载课程助手.command`），再在 Chrome 里点"移除" |
 
 ## Mac
 

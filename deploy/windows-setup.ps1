@@ -13,17 +13,40 @@
 # 换安装位置：
 #   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\windows-setup.ps1" -Dir "E:\CourseHelper"
 # 卸载：
-#   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\CourseHelper\deploy\windows-uninstall.ps1"
+#   双击 Windows-卸载课程助手.bat
+# 默认位置：第一个不是系统盘的本地硬盘（如 D:\CourseHelper）；只有 C 盘时放在 C:\Users\你\CourseHelper。
+# 已经装过的话沿用原来的位置。
 
 param(
   [string]$Repo = 'tommylulu0723/brightspace-helper',
-  [string]$Dir = (Join-Path $env:USERPROFILE 'CourseHelper')
+  [string]$Dir = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $TaskName = 'CourseHelper AutoUpdate'
 $LogDir = Join-Path $env:LOCALAPPDATA 'CourseHelper'
 $Log = Join-Path $LogDir 'update.log'
+$LocFile = Join-Path $LogDir 'location.txt'   # 记住装在哪，卸载 / 重装时用
+
+function Find-Existing {
+  $c = @()
+  if (Test-Path $LocFile) { $c += (Get-Content $LocFile -Raw).Trim() }
+  $c += (Join-Path $env:USERPROFILE 'CourseHelper')
+  try { $c += Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object { "$($_.DeviceID)\CourseHelper" } } catch { }
+  foreach ($d in $c) { if ($d -and (Test-Path (Join-Path $d '.git'))) { return $d } }
+  return $null
+}
+function Default-Dir {
+  # 优先放在不是系统盘、剩余空间 > 1GB 的本地硬盘
+  try {
+    $sys = $env:SystemDrive
+    $disk = Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Where-Object { $_.DeviceID -ne $sys -and $_.FreeSpace -gt 1GB } | Sort-Object DeviceID | Select-Object -First 1
+    if ($disk) { return "$($disk.DeviceID)\CourseHelper" }
+  } catch { }
+  return (Join-Path $env:USERPROFILE 'CourseHelper')
+}
+if (-not $Dir) { $Dir = Find-Existing }
+if (-not $Dir) { $Dir = Default-Dir }
 
 function Ok($m) { Write-Host "✓ $m" -ForegroundColor Green }
 # 用 throw 而不是 exit：一行命令（irm | iex）安装时 exit 会把整个 PowerShell 窗口关掉
@@ -71,6 +94,8 @@ if (Test-Path (Join-Path $Dir '.git')) {
   Ok "代码已下载到 $Dir"
 }
 if (-not (Test-Path (Join-Path $Dir 'extension\manifest.json'))) { Fail '仓库里没找到 extension\manifest.json，代码可能还没推上去' }
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+Set-Content -Path $LocFile -Value $Dir -Encoding UTF8
 
 # 3. 每分钟自动拉取：任务计划程序 + conhost --headless（后台运行，不会每分钟闪一个黑窗口）
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
