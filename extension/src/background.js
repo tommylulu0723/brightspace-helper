@@ -7,6 +7,7 @@ import { diffSync, mergeUpdates, describeUpdate } from './lib/changes.js';
 import { buildPlan } from './lib/plan.js';
 import { unreadCount } from './lib/feed.js';
 import { VERSION_NOTES } from './config.js';
+import { parseFirstNotes } from './lib/selfupdate.js';
 
 const ALARM = 'sync';
 const PERIOD_MIN = 30;
@@ -40,47 +41,79 @@ async function ensureAlarm() {
   if (!u) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 1 });
 }
 
-// ---------------- 自动更新 ----------------
-// 插件文件夹是 GitHub 仓库，Mac 上的定时任务每分钟 git pull 一次。
-// 这里每分钟读一次磁盘上的 manifest.json：版本号变了就自动重新加载，用上新代码。
+// ---------------- 热更新 ----------------
+// 插件文件夹是 GitHub 仓库，电脑上的定时任务每分钟 git pull 一次（新文件已经在磁盘上了）。
+// 这里每分钟读一次磁盘上的 manifest.json：版本号变了 → 弹"检测到更新"，点"立即更新"重新加载，几秒钟用上新代码。
+// 设置里打开"自动安装更新"则不问，直接更新。
+async function readDisk(path) {
+  const r = await fetch(chrome.runtime.getURL(path), { cache: 'no-store' });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.text();
+}
+
 async function checkSelfUpdate() {
-  if (chrome.runtime.getManifest().update_url) return; // 从应用商店装的由 Chrome 自己更新
+  if (chrome.runtime.getManifest().update_url) return null; // 从应用商店装的由 Chrome 自己更新
+  const running = chrome.runtime.getManifest().version;
   let disk;
   try {
-    const r = await fetch(chrome.runtime.getURL('manifest.json'), { cache: 'no-store' });
-    disk = JSON.parse(await r.text());
-  } catch {
-    return; // 正在拉取、文件写到一半时可能读到不完整的内容，下一分钟再看
-  }
-  const running = chrome.runtime.getManifest().version;
-  if (!disk?.version || disk.version === running) return;
-  // 确认新版本的后台脚本完整可读，避免拉到一半就重启
-  try {
+    disk = JSON.parse(await readDisk('manifest.json'));
+    // 确认新版本的后台脚本完整可读，避免拉到一半就更新
     const bg = disk.background?.service_worker;
-    if (bg) {
-      const r = await fetch(chrome.runtime.getURL(bg), { cache: 'no-store' });
-      if (!r.ok || !(await r.text()).trim()) return;
-    }
+    if (bg && !(await readDisk(bg)).trim()) return null;
   } catch {
-    return;
+    return null; // 正在拉取、文件写到一半时可能读到不完整的内容，下一分钟再看
   }
-  await chrome.storage.local.set({ justUpdated: { from: running, to: disk.version, at: new Date().toISOString() } });
-  chrome.runtime.reload();
+  const { pendingUpdate, settings = {} } = await chrome.storage.local.get(['pendingUpdate', 'settings']);
+  if (!disk?.version || disk.version === running) {
+    if (pendingUpdate) await chrome.storage.local.remove('pendingUpdate');
+    return null;
+  }
+  if (pendingUpdate?.to === disk.version) return pendingUpdate;
+
+  let notes = [];
+  try {
+    const n = parseFirstNotes(await readDisk('src/config.js'));
+    if (n && n.v === disk.version) notes = n.items;
+  } catch { /* 没有更新说明也能更新 */ }
+  const pending = { from: running, to: disk.version, notes, at: new Date().toISOString() };
+  await chrome.storage.local.set({ pendingUpdate: pending });
+
+  if (settings.autoApplyUpdate) { applyUpdate(); return pending; }
+  refreshBadge();
+  chrome.notifications.create(`pending:${disk.version}`, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+    title: `检测到更新：课程助手 ${disk.version}`,
+    message: notes.length ? notes.slice(0, 2).map((x) => `• ${x}`).join('\n') : `当前 ${running}，点"立即更新"几秒钟就好`,
+    buttons: [{ title: '立即更新' }, { title: '稍后' }],
+    requireInteraction: true,
+    priority: 1
+  });
+  return pending;
+}
+
+async function applyUpdate() {
+  const { pendingUpdate } = await chrome.storage.local.get('pendingUpdate');
+  const running = chrome.runtime.getManifest().version;
+  await chrome.storage.local.set({ justUpdated: { from: running, to: pendingUpdate?.to || '', at: new Date().toISOString() } });
+  await chrome.storage.local.remove('pendingUpdate');
+  setTimeout(() => chrome.runtime.reload(), 200);
 }
 
 async function announceUpdate() {
+  await chrome.storage.local.remove('pendingUpdate');
   const { justUpdated } = await chrome.storage.local.get('justUpdated');
   if (!justUpdated) return;
   await chrome.storage.local.remove('justUpdated');
   const v = chrome.runtime.getManifest().version;
-  if (justUpdated.to !== v) return;
+  if (justUpdated.to && justUpdated.to !== v) return;
   let note = '';
   const n = VERSION_NOTES.find((x) => x.v === v);
   if (n) note = n.items.slice(0, 2).map((x) => `• ${x}`).join('\n');
   chrome.notifications.create(`updated:${v}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
-    title: `课程助手已自动更新到 ${v}`,
+    title: `✓ 已更新到 ${v}`,
     message: note || '点这里看更新了什么',
     priority: 0
   });
@@ -92,7 +125,7 @@ async function setStatus(patch) {
 }
 
 async function refreshBadge() {
-  const { data, overrides = {}, status = {}, updates = [], seenAt = 0, settings = {} } = await chrome.storage.local.get(['data', 'overrides', 'status', 'updates', 'seenAt', 'settings']);
+  const { data, overrides = {}, status = {}, updates = [], seenAt = 0, settings = {}, pendingUpdate } = await chrome.storage.local.get(['data', 'overrides', 'status', 'updates', 'seenAt', 'settings', 'pendingUpdate']);
   if (status.state === 'error' && status.error?.code === 'AUTH_REQUIRED') {
     await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
     await chrome.action.setBadgeText({ text: '!' });
@@ -107,11 +140,16 @@ async function refreshBadge() {
   if (n) {
     await chrome.action.setBadgeBackgroundColor({ color: '#B91C1C' });
     await chrome.action.setBadgeText({ text: String(n) });
+  } else if (pendingUpdate) {
+    // 绿色 NEW = 有新版本等你点"立即更新"
+    await chrome.action.setBadgeBackgroundColor({ color: '#16A34A' });
+    await chrome.action.setBadgeText({ text: 'NEW' });
   } else {
     await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
     await chrome.action.setBadgeText({ text: unread ? String(Math.min(unread, 99)) : '' });
   }
   const parts = [];
+  if (pendingUpdate) parts.push(`有新版本 ${pendingUpdate.to}`);
   if (n) parts.push(`${n} 项 48 小时内到期或已逾期`);
   if (unread) parts.push(`${unread} 条新动态`);
   await chrome.action.setTitle({ title: parts.length ? `课程助手：${parts.join('，')}` : '课程助手' });
@@ -334,6 +372,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 chrome.runtime.onStartup.addListener(async () => {
   await ensureAlarm();
+  await chrome.storage.local.remove('pendingUpdate');
   syncNow('startup');
 });
 
@@ -342,7 +381,14 @@ chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === ALARM) syncNow('alarm');
 });
 
+chrome.notifications.onButtonClicked.addListener((id, idx) => {
+  if (!id.startsWith('pending:')) return;
+  chrome.notifications.clear(id);
+  if (idx === 0) applyUpdate();
+});
+
 chrome.notifications.onClicked.addListener((id) => {
+  if (id.startsWith('pending:')) { chrome.notifications.clear(id); applyUpdate(); return; }
   const hash = id.startsWith('updates') ? '#updates' : id.startsWith('updated:') ? '#settings' : '#deadlines';
   const url = id === 'login' ? `${BASE_URL}/d2l/home` : chrome.runtime.getURL(DASHBOARD) + hash;
   chrome.tabs.create({ url });
@@ -352,7 +398,7 @@ chrome.notifications.onClicked.addListener((id) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && (changes.overridesAt || changes.settingsAt)) scheduleCloudPush();
   if (area === 'local' && (changes.seenAt || changes.settings)) refreshBadge();
-  if (area === 'local' && changes.overrides) refreshBadge();
+  if (area === 'local' && (changes.overrides || changes.pendingUpdate)) refreshBadge();
 });
 
 // 刚登录完 Brightspace 时，如果之前是"登录过期"状态，马上补一次同步
@@ -371,6 +417,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'reload') {
     sendResponse({ ok: true });
     setTimeout(() => chrome.runtime.reload(), 200);
+    return false;
+  }
+  if (msg && msg.type === 'checkUpdate') {
+    checkSelfUpdate().then((p) => sendResponse({ pending: p }));
+    return true;
+  }
+  if (msg && msg.type === 'applyUpdate') {
+    sendResponse({ ok: true });
+    applyUpdate();
     return false;
   }
   if (msg && msg.type === 'cloudSync') {

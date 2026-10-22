@@ -2,7 +2,7 @@
 // 没有 chrome.storage（直接用网页服务器打开 html）时进入演示模式，显示示例数据。
 import { demoData } from './demo.js';
 
-export const KEYS = ['data', 'status', 'overrides', 'overridesAt', 'settings', 'settingsAt', 'cloud', 'updates', 'seenAt'];
+export const KEYS = ['data', 'status', 'overrides', 'overridesAt', 'settings', 'settingsAt', 'cloud', 'updates', 'seenAt', 'pendingUpdate'];
 
 export function createStore() {
   const ext = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
@@ -17,7 +17,9 @@ export function createStore() {
       download: (files) => chrome.runtime.sendMessage({ type: 'download', files }),
       openDashboard: (view) => chrome.runtime.sendMessage({ type: 'openDashboard', view }),
       version: () => chrome.runtime.getManifest().version,
-      reload: () => chrome.runtime.sendMessage({ type: 'reload' })
+      reload: () => chrome.runtime.sendMessage({ type: 'reload' }),
+      checkUpdate: () => chrome.runtime.sendMessage({ type: 'checkUpdate' }),
+      applyUpdate: () => chrome.runtime.sendMessage({ type: 'applyUpdate' })
     };
   }
 
@@ -46,6 +48,8 @@ export function createStore() {
     download: async (files) => ({ ok: files.length, failed: [] }),
     openDashboard: async (view) => { window.open(`../dashboard/dashboard.html${view ? `#${view}` : ''}`, '_blank'); },
     version: () => 'demo',
-    reload: async () => location.reload()
+    reload: async () => location.reload(),
+    checkUpdate: async () => ({ pending: null }),
+    applyUpdate: async () => location.reload()
   };
 }

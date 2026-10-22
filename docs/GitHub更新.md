@@ -1,6 +1,26 @@
-# 用 GitHub 自动更新课程助手（Windows · 每 1 分钟检查一次）
+# 用 GitHub 热更新课程助手（每 1 分钟检查一次）
 
-设置好之后：我把新版本推到 GitHub → 你电脑每分钟自动拉取 → 插件发现新版本后自己重新加载，并弹出"课程助手已自动更新到 x.x.x"的通知。你什么都不用点。
+设置好之后：新版本推到 GitHub → 电脑每分钟自动拉取 → 插件弹出"检测到更新 x.x.x"（系统通知 + 插件里的绿色横幅，图标显示绿色 NEW）→ 点"立即更新"几秒钟就换成新版本。设置 → 通知 里打开"自动安装插件更新"就连点都不用点。
+
+## 分享给朋友（一劳永逸）
+
+前提：仓库设成公开（Settings → Danger Zone → Change visibility → Public）。朋友不需要 GitHub 账号，也不用下载任何文件。
+
+**Windows**：打开 PowerShell，粘贴回车：
+
+```powershell
+iex ((irm https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/windows-setup.ps1).TrimStart([char]0xFEFF))
+```
+
+**Mac**：打开终端，粘贴回车（问令牌时直接回车）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/mac-setup.sh | bash
+```
+
+然后在 Chrome 加载脚本最后提示的 `CourseHelper\extension` 文件夹。以后你每发一个新版本，所有朋友的插件都会弹"检测到更新"。
+
+下面是第一次给自己（私有仓库）设置的完整步骤。
 
 ```
 GitHub 仓库 ──(每 1 分钟 git pull，任务计划程序)──> C:\Users\你\CourseHelper
@@ -50,8 +70,8 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\windows-set
 
 ## 平时
 
-- 什么都不用做。新版本 1–2 分钟内自动生效，会弹通知；插件"设置 → 更新日志"能看到改了什么。
-- 如果哪次弹了"新版本已下载"但插件看起来没变：打开插件 **设置 → 更新日志 → 重新加载插件**，或在 `chrome://extensions` 点课程助手上的刷新按钮。
+- 新版本 1–2 分钟内会弹"检测到更新"，点"立即更新"；插件"设置 → 更新日志"能看到改了什么。
+- 如果点了"立即更新"但插件看起来没变：打开插件 **设置 → 更新日志 → 重新加载插件**，或在 `chrome://extensions` 点课程助手上的刷新按钮。
 - 电脑关机或睡眠期间不会更新，开机登录后会马上补拉一次。
 
 ## 检查是否在正常工作

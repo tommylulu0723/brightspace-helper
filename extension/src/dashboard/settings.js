@@ -231,15 +231,16 @@ function renderCourses(body, ctx) {
 // ---------------- 通知 / 诊断 / 更新日志 ----------------
 function renderNotify(body, ctx) {
   const s = ctx.state.settings || {};
-  const row = (key, label, hint) => {
-    const input = h('input', { type: 'checkbox', checked: s[key] !== false });
+  const row = (key, label, hint, def = true) => {
+    const input = h('input', { type: 'checkbox', checked: def ? s[key] !== false : !!s[key] });
     input.addEventListener('change', () => ctx.store.set({ settings: { ...(ctx.state.settings || {}), [key]: input.checked }, settingsAt: Date.now() }));
     return h('label', { class: 'check-row' }, input, h('span', {}, h('b', {}, label), hint ? h('span', { class: 'muted' }, ` · ${hint}`) : null));
   };
   fill(body,
     row('notifyPlan', '每天早上的今日计划', '8 点以后第一次同步时，告诉你今天先做哪几件'),
     row('notify', '快到期提醒', '24 小时内到期的事项各提醒一次；Brightspace 登录过期时提醒重新登录'),
-    row('notifyUpdates', '动态提醒', '新公告、新课件、课件更新、截止时间改动、新作业、出分'));
+    row('notifyUpdates', '动态提醒', '新公告、新课件、课件更新、截止时间改动、新作业、出分'),
+    row('autoApplyUpdate', '自动安装插件更新', '关闭时：检测到新版本先弹窗问你，点"立即更新"才更新', false));
 }
 
 function renderDiag(body, ctx) {
@@ -261,8 +262,8 @@ function renderChangelog(body, ctx) {
   fill(body,
     h('div', { class: 'btn-row' },
       h('span', { class: 'hint' }, `当前版本 ${ctx.store.version()}`),
-      h('button', { type: 'button', class: 'btn small', title: '用 GitHub Desktop 拉取新版本后点这里，不用去扩展管理页', onClick: () => ctx.store.reload() }, icon(I.refresh, 14), '重新加载插件')),
-    h('p', { class: 'hint' }, '用 GitHub 更新：在 GitHub Desktop 里点 Fetch origin → Pull origin，然后点上面的"重新加载插件"就是新版本了。'),
+      h('button', { type: 'button', class: 'btn small', title: '检测到更新后没反应时点这里', onClick: () => ctx.store.reload() }, icon(I.refresh, 14), '重新加载插件')),
+    h('p', { class: 'hint' }, '热更新：电脑每分钟从 GitHub 拉取新版本，插件发现后弹出"检测到更新"，点"立即更新"几秒钟就好，不用重新装。'),
     ...VERSION_NOTES.map((n) => h('div', { class: 'log' }, h('strong', {}, `v${n.v}`), h('span', { class: 'muted' }, ` · ${n.d}`), h('ul', {}, ...n.items.map((x) => h('li', {}, x))))));
 }
 
@@ -272,7 +273,7 @@ export function renderSettingsView(root, ctx) {
   once('courses', [st.data?.allCourses, st.data?.courses?.map((c) => c.id), st.settings?.hiddenCourseIds, st.settings?.addedCourseIds], () =>
     renderCourses(section(root, 'courses', '课程管理', '移除不重要的课（比如社团、培训类"课程"），或者把没被自动识别的课加回来。改完会自动重新同步截止时间和课件。'), ctx));
   section(root, 'courses', '课程管理');
-  once('notify', [st.settings?.notify, st.settings?.notifyPlan, st.settings?.notifyUpdates], () => renderNotify(section(root, 'notify', '通知'), ctx));
+  once('notify', [st.settings?.notify, st.settings?.notifyPlan, st.settings?.notifyUpdates, st.settings?.autoApplyUpdate], () => renderNotify(section(root, 'notify', '通知'), ctx));
   section(root, 'notify', '通知');
   once('account', [st.cloud?.token, st.cloud?.user, st.cloud?.error, st.cloud?.lastCloudSync, authMode], () =>
     renderAccount(section(root, 'account', '账号与云同步（可选）', null), ctx));

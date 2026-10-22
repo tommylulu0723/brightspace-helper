@@ -134,8 +134,21 @@ function renderBanner() {
     b.hidden = false;
   }
   const ann = state.cloud?.token ? state.cloud.announcement : '';
-  $('announce').hidden = !ann;
-  $('announce').textContent = ann ? `📣 ${ann}` : '';
+  const up = state.pendingUpdate;
+  const a = $('announce');
+  if (up) {
+    a.className = 'banner update';
+    fill(a,
+      h('span', { class: 'up-text' },
+        h('strong', {}, `检测到更新：${up.from} → ${up.to}`),
+        up.notes?.length ? h('span', {}, up.notes.slice(0, 3).join('；')) : null),
+      h('button', { type: 'button', class: 'btn small primary', onClick: (e) => { e.target.disabled = true; e.target.textContent = '正在更新…'; store.applyUpdate(); setTimeout(() => location.reload(), 2500); } }, '立即更新'));
+    a.hidden = false;
+  } else {
+    a.className = 'banner info';
+    a.hidden = !ann;
+    a.textContent = ann ? `📣 ${ann}` : '';
+  }
 }
 
 function renderSide(ctx) {
@@ -672,7 +685,8 @@ async function load() {
   const got = await store.get(KEYS);
   state = {
     data: got.data || null, status: got.status || {}, overrides: got.overrides || {}, settings: got.settings || {},
-    cloud: got.cloud || null, updates: got.updates || [], seenAt: got.seenAt || 0
+    cloud: got.cloud || null, updates: got.updates || [], seenAt: got.seenAt || 0,
+    pendingUpdate: got.pendingUpdate || null
   };
   render();
 }
@@ -696,5 +710,6 @@ window.addEventListener('hashchange', () => {
 });
 
 store.onChanged(load);
+store.checkUpdate?.();
 setInterval(() => { if (ui.view !== 'settings') render(); }, 60 * 1000);
 load();

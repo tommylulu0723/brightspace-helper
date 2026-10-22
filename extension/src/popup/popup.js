@@ -24,7 +24,7 @@ function h(tag, attrs = {}, ...children) {
 }
 
 async function render() {
-  const { data, status = {}, overrides = {}, settings = {}, updates = [], seenAt = 0 } = await store.get(['data', 'status', 'overrides', 'settings', 'updates', 'seenAt']);
+  const { data, status = {}, overrides = {}, settings = {}, updates = [], seenAt = 0, pendingUpdate } = await store.get(['data', 'status', 'overrides', 'settings', 'updates', 'seenAt', 'pendingUpdate']);
   const now = new Date();
   const syncing = status.state === 'syncing';
 
@@ -40,6 +40,15 @@ async function render() {
       h('span', {}, auth ? 'Brightspace 没登录或登录已过期。' : `同步失败：${status.error?.message || ''}`),
       auth ? h('a', { class: 'btn small', href: `${BASE_URL}/d2l/home`, target: '_blank', rel: 'noopener' }, '去登录') : null
     );
+    banner.hidden = false;
+  } else if (pendingUpdate) {
+    banner.className = 'pbanner update';
+    const btn = h('button', { class: 'btn small primary', type: 'button' }, '立即更新');
+    btn.addEventListener('click', () => { btn.disabled = true; btn.textContent = '正在更新…'; store.applyUpdate(); setTimeout(() => window.close(), 600); });
+    banner.replaceChildren(
+      h('strong', {}, `检测到更新 ${pendingUpdate.to}（当前 ${pendingUpdate.from}）`),
+      pendingUpdate.notes?.length ? h('ul', { class: 'up-notes' }, ...pendingUpdate.notes.slice(0, 3).map((x) => h('li', {}, x))) : null,
+      btn);
     banner.hidden = false;
   } else {
     banner.hidden = true;
@@ -112,3 +121,4 @@ $('matBtn').addEventListener('click', async () => {
 
 store.onChanged(render);
 render();
+store.checkUpdate?.();

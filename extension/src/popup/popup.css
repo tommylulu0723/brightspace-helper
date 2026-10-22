@@ -13,6 +13,8 @@ body { width: 380px; min-height: 200px; }
 
 .pbanner { margin: 10px 14px 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
 .pbanner.error { background: var(--danger-soft); color: var(--danger); }
+.pbanner.update { background: #dcfce7; color: #14532d; }
+.pbanner .up-notes { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.5; }
 .pbanner .btn { align-self: flex-start; }
 
 .summary { display: flex; gap: 8px; padding: 12px 14px 4px; }

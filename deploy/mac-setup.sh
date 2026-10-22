@@ -8,6 +8,8 @@
 # 之后有新版本时，插件会在 1–2 分钟内自己重新加载并弹通知。
 #
 # 用法：在"终端"里运行  bash ~/Downloads/mac-setup.sh
+# 朋友安装（仓库公开时，一行命令）：
+#   curl -fsSL https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/mac-setup.sh | bash
 # 卸载：bash ~/CourseHelper/deploy/mac-uninstall.sh
 
 set -e
@@ -40,7 +42,7 @@ if [ ! -d "$DIR/.git" ]; then
   echo
   echo "如果仓库是私有的，需要一个只读令牌（在 GitHub 网页上生成，见教程第 2 步）。"
   echo "粘贴令牌后回车（输入时屏幕上不显示，正常）；公开仓库直接回车："
-  read -r -s TOKEN
+  read -r -s TOKEN < /dev/tty || TOKEN=""
   echo
   if [ -n "$TOKEN" ]; then
     # 存进 macOS 钥匙串，不写在任何文件里
@@ -91,6 +93,6 @@ echo "  2. 右上角打开"开发者模式"，点"加载已解压的扩展程序
 echo "  3. 选这个文件夹： $DIR/extension"
 echo "     （在选择窗口里按 Cmd+Shift+G，粘贴上面的路径，回车）"
 echo
-echo "之后有新版本会在 1–2 分钟内自动更新，并弹出\"课程助手已自动更新\"的通知。"
+echo "之后有新版本时，插件会弹出\"检测到更新\"，点\"立即更新\"就好。"
 echo "查看更新记录：cat $LOG"
 open "$DIR" 2>/dev/null || true

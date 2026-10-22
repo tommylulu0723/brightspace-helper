@@ -6,7 +6,9 @@
 #   3. 告诉你怎么在 Chrome 里加载插件
 # 之后有新版本时，插件会在 1–2 分钟内自己重新加载并弹通知。
 #
-# 用法（在 PowerShell 里粘贴运行）：
+# 朋友安装（仓库公开时，一行命令，不用下载文件）：
+#   iex ((irm https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/windows-setup.ps1).TrimStart([char]0xFEFF))
+# 用法（下载了这个文件时，在 PowerShell 里粘贴运行）：
 #   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\windows-setup.ps1"
 # 换安装位置：
 #   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\windows-setup.ps1" -Dir "E:\CourseHelper"
@@ -24,7 +26,8 @@ $LogDir = Join-Path $env:LOCALAPPDATA 'CourseHelper'
 $Log = Join-Path $LogDir 'update.log'
 
 function Ok($m) { Write-Host "✓ $m" -ForegroundColor Green }
-function Fail($m) { Write-Host "✗ $m" -ForegroundColor Red; exit 1 }
+# 用 throw 而不是 exit：一行命令（irm | iex）安装时 exit 会把整个 PowerShell 窗口关掉
+function Fail($m) { Write-Host "✗ $m" -ForegroundColor Red; throw $m }
 
 Write-Host '课程助手 · 自动更新安装' -ForegroundColor Cyan
 Write-Host "仓库：github.com/$Repo"
@@ -89,6 +92,6 @@ Write-Host '  1. Chrome 打开 chrome://extensions ，把旧的"课程助手"移
 Write-Host '  2. 右上角打开"开发者模式"，点"加载已解压的扩展程序"'
 Write-Host "  3. 选这个文件夹：$Dir\extension"
 Write-Host ''
-Write-Host '之后有新版本会在 1–2 分钟内自动更新，并弹出"课程助手已自动更新"的通知。'
+Write-Host '之后有新版本时，插件会弹出"检测到更新"，点"立即更新"就好，不用重新安装。'
 Write-Host "更新记录：$Log"
 Start-Process explorer.exe (Join-Path $Dir 'extension')

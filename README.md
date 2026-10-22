@@ -1,4 +1,4 @@
-# 课程助手 1.1.1（插件 + 可选后端）
+# 课程助手 1.2（插件 + 可选后端）
 
 ```
 extension/   Chrome 插件：截止时间汇总、课件库、课程管理、账号登录（可选）
@@ -19,7 +19,7 @@ deploy/      服务器自动更新脚本、Caddy 配置片段
 
 ## 用 GitHub 更新插件
 
-见 [docs/GitHub更新.md](docs/GitHub更新.md)：Windows 运行一次 `deploy/windows-setup.ps1`（Mac 用 `deploy/mac-setup.sh`），之后电脑每 1 分钟从 GitHub 拉取，插件发现新版本会自己重新加载并弹通知。
+见 [docs/GitHub更新.md](docs/GitHub更新.md)：Windows 运行一次 `deploy/windows-setup.ps1`（Mac 用 `deploy/mac-setup.sh`），之后电脑每 1 分钟从 GitHub 拉取，插件发现新版本弹出"检测到更新"，点"立即更新"即可（热更新，不用重装）。朋友用一行命令安装，见文档开头。
 
 ## 一、部署后端（腾讯云香港服务器，和情侣空间放一起）
 
