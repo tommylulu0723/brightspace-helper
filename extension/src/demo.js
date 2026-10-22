@@ -110,7 +110,7 @@ export function demoData(now = new Date()) {
     news,
     grades,
     demoUpdates,
-    user: { name: 'Tommy Lu' },
+    user: { name: 'Alex Chen' },
     courses: courses.map((c) => ({ ...c, auto: true, count: items.filter((i) => i.courseId === c.id).length })),
     allCourses: [
       ...courses.map((c) => ({ ...c, start: '2026-09-02T00:00:00Z', end: '2026-12-20T00:00:00Z', current: true, auto: true, active: true })),
