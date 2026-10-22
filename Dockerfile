@@ -6,7 +6,7 @@ COPY server/lib ./lib
 COPY server/public ./public
 # 手机版页面和插件共用的分组 / 时间显示逻辑、样式
 COPY extension/src/shared.css ./shared/shared.css
-COPY extension/src/lib/format.js extension/src/lib/merge.js extension/src/lib/plan.js ./shared/lib/
+COPY extension/src/lib/format.js extension/src/lib/merge.js extension/src/lib/plan.js extension/src/lib/i18n.js ./shared/lib/
 ENV PORT=3100 DATA_DIR=/data
 VOLUME /data
 EXPOSE 3100

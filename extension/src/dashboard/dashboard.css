@@ -455,3 +455,4 @@ body.locked .wrap, body.locked .tabs, body.locked .search, body.locked .sync { d
 
 .gate-card .tip.warn { display: flex; flex-direction: column; gap: 3px; margin-top: -4px; padding: 11px 13px; border-radius: 12px; background: var(--warn-soft); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
 .gate-card .tip.warn b { color: var(--warn); font-size: 13.5px; }
+.lang-seg { align-self: flex-start; } .lang-seg button { min-width: 88px; }

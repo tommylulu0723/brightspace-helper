@@ -20,7 +20,7 @@ await test('谁新用谁：服务器的"标记完成"更新时拉下来，本机
 await test('上传的设置只有白名单字段（不会带上 API key）', () => {
   const p = publicSettings({ hiddenCourseIds: ['1'], notify: true, anthropicKey: 'sk-ant-secret', somethingElse: 1 });
   assert.ok(!JSON.stringify(p).includes('secret'));
-  assert.deepEqual(Object.keys(p).sort(), ['addedCourseIds', 'hiddenCourseIds', 'notify']);
+  assert.deepEqual(Object.keys(p).sort(), ['addedCourseIds', 'hiddenCourseIds', 'lang', 'notify']);
 });
 await test('快照去掉下载地址和判断依据，体积更小', () => {
   const s = compactSnapshot({

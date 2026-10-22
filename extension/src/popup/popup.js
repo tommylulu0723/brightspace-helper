@@ -5,6 +5,8 @@ import { buildPlan } from '../lib/plan.js';
 import { unreadCount } from '../lib/feed.js';
 import { gateState } from '../lib/gate.js';
 import { REQUIRE_LOGIN } from '../config.js';
+import { loadLang } from '../lang.js';
+import { translatePage, getLang, setLang } from '../lib/i18n.js';
 
 const store = createStore();
 const $ = (id) => document.getElementById(id);
@@ -64,7 +66,7 @@ async function render() {
     btn.addEventListener('click', () => { btn.disabled = true; btn.textContent = '正在更新…'; store.applyUpdate(); setTimeout(() => window.close(), 600); });
     banner.replaceChildren(
       h('strong', {}, `检测到更新 ${pendingUpdate.to}（当前 ${pendingUpdate.from}）`),
-      pendingUpdate.notes?.length ? h('ul', { class: 'up-notes' }, ...pendingUpdate.notes.slice(0, 3).map((x) => h('li', {}, x))) : null,
+      pendingUpdate.notes?.length ? h('ul', { class: 'up-notes' }, ...((getLang() === 'en' && pendingUpdate.notesEn) || pendingUpdate.notes).slice(0, 3).map((x) => h('li', {}, x))) : null,
       btn);
     banner.hidden = false;
   } else {
@@ -136,6 +138,8 @@ $('matBtn').addEventListener('click', async () => {
   window.close();
 });
 
+if (!store.demo) await loadLang(); else setLang(new URLSearchParams(location.search).get('lang') || 'zh');
+translatePage(document.body);
 store.onChanged(render);
 render();
 store.checkUpdate?.();

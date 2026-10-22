@@ -1,8 +1,8 @@
 @echo off
 chcp 65001 >nul
-title 课程助手 安装
+title Course Helper Setup
 echo.
-echo   正在打开课程助手安装程序…
+echo   正在打开安装程序… / Opening the installer…
 echo.
 set "LOCAL=%~dp0windows-installer.ps1"
 if exist "%LOCAL%" (

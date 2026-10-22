@@ -12,11 +12,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="/shared.css">
-<link rel="stylesheet" href="m.css?v=3">
+<link rel="stylesheet" href="m.css?v=4">
 </head>
 <body>
 <div id="auth" class="auth" hidden>
   <div class="auth-card">
+    <div class="lang-switch" data-no-tr><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">EN</button></div>
     <div class="auth-brand">
       <span class="auth-logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span>
       <div><strong>课程助手</strong><span>NYU Brightspace 截止时间 · 今日计划 · 邮件提醒</span></div>
@@ -59,7 +60,8 @@
       <div class="hello" id="hello"></div>
       <div class="synced" id="synced"></div>
     </div>
-    <button id="logoutBtn" class="btn small" type="button">退出</button>
+    <div class="top-actions"><div class="lang-switch" data-no-tr><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">EN</button></div>
+    <button id="logoutBtn" class="btn small" type="button">退出</button></div>
   </header>
   <div id="announce" class="announce" hidden></div>
   <div id="locked" class="locked-box" hidden></div>
@@ -71,6 +73,6 @@
   <p class="foot" id="installTip">iPhone / iPad：在 Safari 里点"分享"→"添加到主屏幕"，用起来就像 App。<br>Android：Chrome 菜单 →"添加到主屏幕"。勾选完成会同步回电脑上的插件。</p>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
-<script type="module" src="m.js?v=3"></script>
+<script type="module" src="m.js?v=4"></script>
 </body>
 </html>

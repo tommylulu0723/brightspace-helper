@@ -3,6 +3,7 @@
 import { h, fill, add, icon, I, toast, confirmDialog, initials } from './ui.js';
 import { cloud, normalizeServer } from '../lib/cloud.js';
 import { DEFAULT_SERVER, VERSION_NOTES, REQUIRE_LOGIN } from '../config.js';
+import { getLang } from '../lib/i18n.js';
 import { courseColorMap } from '../lib/format.js';
 
 const sections = {};
@@ -161,7 +162,7 @@ function renderAccount(body, ctx) {
     btn.disabled = true;
     try {
       const body = { email: f.get('email'), password: f.get('password') };
-      const r = reg ? await cloud.register(url, { ...body, firstName: f.get('firstName'), lastName: f.get('lastName'), invite: f.get('invite') }) : await cloud.login(url, body);
+      const r = reg ? await cloud.register(url, { ...body, firstName: f.get('firstName'), lastName: f.get('lastName'), invite: f.get('invite'), lang: getLang() }) : await cloud.login(url, body);
       await ctx.store.set({ cloud: { server: url, token: r.token, user: r.user, flags: r.flags || {}, error: null } });
       toast(reg ? `注册成功，欢迎 ${r.user.name}` : `欢迎回来，${r.user.name}`);
       ctx.store.sync();
@@ -302,7 +303,30 @@ function renderChangelog(body, ctx) {
       h('span', { class: 'hint' }, `当前版本 ${ctx.store.version()}`),
       h('button', { type: 'button', class: 'btn small', title: '检测到更新后没反应时点这里', onClick: () => ctx.store.reload() }, icon(I.refresh, 14), '重新加载插件')),
     h('p', { class: 'hint' }, '热更新：电脑每分钟从 GitHub 拉取新版本，插件发现后弹出"检测到更新"，点"立即更新"几秒钟就好，不用重新装。'),
-    ...VERSION_NOTES.map((n) => h('div', { class: 'log' }, h('strong', {}, `v${n.v}`), h('span', { class: 'muted' }, ` · ${n.d}`), h('ul', {}, ...n.items.map((x) => h('li', {}, x))))));
+    ...VERSION_NOTES.filter((n) => getLang() !== 'en' || n.en).map((n) => {
+      const en = getLang() === 'en' && n.en;
+      // 没有英文版的旧说明保持中文原文（不做逐词替换）
+      return h('div', { class: 'log' }, h('strong', {}, `v${n.v}`), h('span', { class: 'muted' }, ` · ${n.d}`),
+        h('ul', {}, ...(en || n.items).map((x) => h('li', {}, x))));
+    }),
+    getLang() === 'en' ? h('p', { class: 'hint' }, 'Notes for earlier versions are available in Chinese only.') : null);
+}
+
+// ---------------- 语言 ----------------
+function renderLang(body, ctx) {
+  const cur = getLang();
+  const pick = async (l) => {
+    if (l === cur) return;
+    await ctx.store.set({ settings: { ...(ctx.state.settings || {}), lang: l }, settingsAt: Date.now() });
+    const c = ctx.state.cloud;
+    if (c?.token) { try { await cloud.updateProfile(c.server, c.token, { lang: l }); } catch { /* 下次同步再说 */ } }
+    location.reload();
+  };
+  fill(body,
+    h('div', { class: 'seg lang-seg', role: 'group', 'aria-label': 'Language', 'data-no-tr': '' },
+      h('button', { type: 'button', 'aria-pressed': String(cur === 'zh'), onClick: () => pick('zh') }, '中文'),
+      h('button', { type: 'button', 'aria-pressed': String(cur === 'en'), onClick: () => pick('en') }, 'English')),
+    h('p', { class: 'hint' }, '界面语言，切换后立即生效；提醒邮件也会用这个语言。'));
 }
 
 /** ctx: { state, store, rerender, scheduleResync, copyDiagnostics } */
@@ -311,6 +335,8 @@ export function renderSettingsView(root, ctx) {
   once('courses', [st.data?.allCourses, st.data?.courses?.map((c) => c.id), st.settings?.hiddenCourseIds, st.settings?.addedCourseIds], () =>
     renderCourses(section(root, 'courses', '课程管理', '移除不重要的课（比如社团、培训类"课程"），或者把没被自动识别的课加回来。改完会自动重新同步截止时间和课件。'), ctx));
   section(root, 'courses', '课程管理');
+  once('lang', [getLang()], () => renderLang(section(root, 'lang', '语言 / Language'), ctx));
+  section(root, 'lang', '语言 / Language');
   once('notify', [st.settings?.notify, st.settings?.notifyPlan, st.settings?.notifyUpdates, st.settings?.autoApplyUpdate], () => renderNotify(section(root, 'notify', '通知'), ctx));
   section(root, 'notify', '通知');
   once('account', [st.cloud?.token, st.cloud?.user, st.cloud?.error, st.cloud?.lastCloudSync, authMode], () =>

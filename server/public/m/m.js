@@ -1,6 +1,22 @@
 import { TYPE_LABEL, courseColorMap, isDone, formatDue, formatRelative, formatAgo, groupItems, groupOf, stats } from '/lib/format.js';
 import { isDoneStatus } from '/lib/merge.js';
 import { buildPlan } from '/lib/plan.js';
+import { setLang, getLang, guessLang, translatePage } from '/lib/i18n.js';
+
+// 语言：账号里存的 > 这台设备上次选的 > 浏览器语言
+let savedLang = null;
+try { savedLang = localStorage.getItem('ch_lang'); } catch { /* ignore */ }
+setLang(savedLang || guessLang());
+translatePage(document.body);
+async function switchLang(l) {
+  try { localStorage.setItem('ch_lang', l); } catch { /* ignore */ }
+  if (token) { try { await fetch('/api/me', { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ lang: l }) }); } catch { /* ignore */ } }
+  location.reload();
+}
+for (const b of document.querySelectorAll('[data-lang]')) {
+  b.setAttribute('aria-pressed', String(b.dataset.lang === getLang()));
+  b.addEventListener('click', () => switchLang(b.dataset.lang));
+}
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'ch_token';
@@ -85,7 +101,7 @@ $('loginForm').addEventListener('submit', async (e) => {
     if (mode === 'register') {
       if (!String(f.get('firstName')).trim() || !String(f.get('lastName')).trim()) throw new Error('First name 和 Last name 都要填，并且和 Brightspace 上的一致');
       if (String(f.get('password')).length < 8) throw new Error('密码至少 8 位');
-      const r = await api('POST', '/api/auth/register', { firstName: f.get('firstName'), lastName: f.get('lastName'), email: f.get('email'), password: f.get('password'), invite: f.get('invite') });
+      const r = await api('POST', '/api/auth/register', { firstName: f.get('firstName'), lastName: f.get('lastName'), email: f.get('email'), password: f.get('password'), invite: f.get('invite'), lang: getLang() });
       token = r.token;
       try { localStorage.setItem(KEY, token); } catch { /* ignore */ }
       e.target.hidden = true;
@@ -232,6 +248,8 @@ async function start() {
     return;
   }
   state = { ...(state || {}), me: me.user };
+  // 账号里的语言和这台设备不一样时，以账号为准（换设备也是同一种语言）
+  if (me.user.lang && me.user.lang !== getLang() && !savedLang) { try { localStorage.setItem('ch_lang', me.user.lang); } catch { /* ignore */ } location.reload(); return; }
   const ann = me.announcement;
   $('announce').hidden = !ann;
   $('announce').textContent = ann || '';

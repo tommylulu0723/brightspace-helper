@@ -90,3 +90,11 @@ body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 .form-error:empty { display: none; }
 @media (max-width: 420px) { .auth-card { padding: 24px 18px 20px; border-radius: 18px; } .name-row { grid-template-columns: 1fr; } }
 .tabs2 button[aria-selected="true"] { color: var(--accent-text); }
+
+.auth-card { position: relative; }
+.lang-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunken); }
+.lang-switch button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
+.lang-switch button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.auth-card > .lang-switch { position: absolute; top: 18px; right: 18px; }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.auth-brand { padding-right: 96px; }

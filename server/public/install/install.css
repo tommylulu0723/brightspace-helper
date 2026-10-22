@@ -1,0 +1,26 @@
+body { background: radial-gradient(900px 480px at 50% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%), var(--bg); min-height: 100vh; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 40px 16px 48px; }
+.top { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
+.top .logo { width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #7A1FB8, #57068C); display: grid; place-items: center; flex: none; box-shadow: 0 8px 18px -8px rgba(87, 6, 140, .6); }
+.top div:nth-child(2) { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.top strong { font-size: 24px; letter-spacing: -.01em; }
+.top span { color: var(--muted); font-size: 14px; }
+.lang { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunken); align-self: flex-start; }
+.lang button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 7px; cursor: pointer; }
+.lang button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.step { display: flex; gap: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-sm); }
+.num { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; }
+.step.done .num { background: var(--ok); color: #fff; }
+.body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.body h2 { margin: 4px 0 0; font-size: 17px; }
+.body p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
+.body .hint { color: var(--muted); font-size: 13px; }
+.copy-row { display: flex; gap: 8px; align-items: stretch; margin-top: 4px; }
+.copy-row code { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; background: var(--sunken); font-size: 14px; overflow-wrap: anywhere; display: flex; align-items: center; }
+.copy-row .btn { flex: none; min-width: 84px; justify-content: center; }
+.mock { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--border); font-size: 13px; color: var(--ink-2); }
+.toggle { width: 34px; height: 18px; border-radius: 999px; background: var(--accent); position: relative; }
+.toggle i { position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+.foot { text-align: center; color: var(--muted); font-size: 13px; margin-top: 22px; }
+@media (max-width: 520px) { .step { padding: 16px; gap: 12px; } .copy-row { flex-direction: column; } }

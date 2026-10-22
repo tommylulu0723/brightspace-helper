@@ -58,20 +58,26 @@ export function pruneSent(sent = {}, now = new Date()) {
 
 const TYPE = { assignment: '作业', quiz: '测验', exam: '考试', discussion: '讨论', checklist: '清单', survey: '问卷', content: '课程内容', other: '事项' };
 
-export function fmtDue(iso, now = new Date()) {
+const TYPE_EN = { assignment: 'Assignment', quiz: 'Quiz', exam: 'Exam', discussion: 'Discussion', checklist: 'Checklist', survey: 'Survey', content: 'Content', other: 'Item' };
+
+export function fmtDue(iso, now = new Date(), lang = 'zh') {
   const d = new Date(iso);
   const left = d.getTime() - now.getTime();
-  const when = new Intl.DateTimeFormat('zh-CN', { timeZone: TZ, month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+  const en = lang === 'en';
+  const when = new Intl.DateTimeFormat(en ? 'en-US' : 'zh-CN', { timeZone: TZ, month: en ? 'short' : 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: en }).format(d);
   const hrs = Math.floor(left / H);
   const mins = Math.max(0, Math.round((left % H) / 60000));
-  const rel = hrs >= 1 ? `还剩 ${hrs} 小时${mins ? ` ${mins} 分` : ''}` : `还剩 ${mins} 分钟`;
-  return { when: `${when}（纽约时间）`, rel };
+  const rel = en
+    ? (hrs >= 1 ? `${hrs} h${mins ? ` ${mins} min` : ''} left` : `${mins} min left`)
+    : (hrs >= 1 ? `还剩 ${hrs} 小时${mins ? ` ${mins} 分` : ''}` : `还剩 ${mins} 分钟`);
+  return { when: en ? `${when} (New York time)` : `${when}（纽约时间）`, rel };
 }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /** 一封提醒邮件 */
-export function buildReminderEmail({ name, picks, now = new Date(), siteUrl = '', snapshotAt = 0 }) {
+export function buildReminderEmail({ name, picks, now = new Date(), siteUrl = '', snapshotAt = 0, lang = 'zh' }) {
+  if (lang === 'en') return buildReminderEmailEn({ name, picks, now, siteUrl, snapshotAt });
   const urgent = picks.some((p) => p.window === '3h');
   const first = picks[0];
   const subject = picks.length === 1
@@ -117,6 +123,50 @@ export function buildReminderEmail({ name, picks, now = new Date(), siteUrl = ''
   </div>
   ${stale ? `<p style="font-size:12px;color:#B45309;margin:12px 4px">${esc(stale)}</p>` : ''}
   <p style="font-size:12px;color:#6b7280;margin:12px 4px;line-height:1.6">已经交了？在课程助手里勾选"完成"，就不会再提醒这一项。${siteUrl ? `<br><a href="${esc(siteUrl)}/m/" style="color:#57068C">在手机上查看全部截止时间</a>` : ''}<br>不想收提醒：插件 → 设置 → 账号 → 邮件提醒。</p>
+</div></body></html>`;
+  return { subject, text, html };
+}
+
+function buildReminderEmailEn({ name, picks, now, siteUrl, snapshotAt }) {
+  const urgent = picks.some((p) => p.window === '3h');
+  const first = picks[0];
+  const subject = picks.length === 1
+    ? `${urgent ? '⏰ Due in 3 hours' : '📌 Due tomorrow'}: ${first.item.title}`
+    : `${urgent ? '⏰' : '📌'} ${picks.length} items due ${urgent ? 'soon' : 'within 24 hours'}: ${first.item.title} and more`;
+  const days = Math.round((now.getTime() - snapshotAt) / (24 * H));
+  const stale = snapshotAt && now.getTime() - snapshotAt > 36 * H
+    ? `Note: this is based on a sync from ${days} day${days === 1 ? '' : 's'} ago — the extension on your computer hasn't synced since, so recent due-date changes may be missing.`
+    : '';
+  const lines = picks.map((p) => {
+    const d = fmtDue(p.item.due, now, 'en');
+    return `• [${p.courseName}] ${p.item.title} (${TYPE_EN[p.item.type] || 'Item'})\n  ${d.when}, ${d.rel}${p.item.url ? `\n  ${p.item.url}` : ''}`;
+  });
+  const text = [
+    `Hi ${name || 'there'},`, '',
+    `${picks.length === 1 ? 'This item is' : `These ${picks.length} items are`} due soon and not submitted yet:`, '',
+    ...lines, '', stale,
+    'Already submitted? Mark it done in Course Helper and you won\'t be reminded again.',
+    siteUrl ? `On your phone: ${siteUrl}/m/` : '', '',
+    '— Course Helper (to stop these emails: extension → Settings → Account → Email reminders)'
+  ].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n');
+  const rows = picks.map((p) => {
+    const d = fmtDue(p.item.due, now, 'en');
+    const tone = p.window === '3h' ? '#B91C1C' : '#B45309';
+    return `<tr><td style="padding:12px 14px;border-bottom:1px solid #eee">
+      <div style="font-size:12px;color:#6b7280">${esc(p.courseName)} · ${esc(TYPE_EN[p.item.type] || 'Item')}</div>
+      <div style="font-size:15px;font-weight:600;color:#111827;margin:2px 0">${p.item.url ? `<a href="${esc(p.item.url)}" style="color:#111827;text-decoration:none">${esc(p.item.title)}</a>` : esc(p.item.title)}</div>
+      <div style="font-size:13px;color:${tone}">${esc(d.when)} · ${esc(d.rel)}</div>
+    </td></tr>`;
+  }).join('');
+  const html = `<!doctype html><html><body style="margin:0;background:#f5f3f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<div style="max-width:560px;margin:0 auto;padding:24px 16px">
+  <div style="font-size:13px;color:#57068C;font-weight:700;margin-bottom:10px">Course Helper · Deadline reminder</div>
+  <div style="background:#fff;border-radius:14px;overflow:hidden;border:1px solid #eee">
+    <div style="padding:16px 14px;border-bottom:1px solid #eee;font-size:15px;color:#111827">Hi ${esc(name || 'there')}, ${picks.length === 1 ? 'this item is' : `these ${picks.length} items are`} due soon and not submitted yet:</div>
+    <table style="width:100%;border-collapse:collapse">${rows}</table>
+  </div>
+  ${stale ? `<p style="font-size:12px;color:#B45309;margin:12px 4px">${esc(stale)}</p>` : ''}
+  <p style="font-size:12px;color:#6b7280;margin:12px 4px;line-height:1.6">Already submitted? Mark it done in Course Helper and you won't be reminded again.${siteUrl ? `<br><a href="${esc(siteUrl)}/m/" style="color:#57068C">See all deadlines on your phone</a>` : ''}<br>To stop these emails: extension → Settings → Account → Email reminders.</p>
 </div></body></html>`;
   return { subject, text, html };
 }

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安装课程助手 · 最后一步</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="install.css?v=1">
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <span class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5z"/><path d="M8 7h6"/><path d="M8 11h4"/></svg></span>
+    <div><strong data-t="title"></strong><span data-t="sub"></span></div>
+    <div class="lang"><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">EN</button></div>
+  </header>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="num">1</div>
+      <div class="body">
+        <h2 data-t="s1"></h2>
+        <p data-t="s1d"></p>
+        <div class="copy-row"><code>chrome://extensions</code><button type="button" class="btn primary" data-copy="chrome://extensions" data-t="copy"></button></div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="num">2</div>
+      <div class="body">
+        <h2 data-t="s2"></h2>
+        <p data-t="s2d"></p>
+        <div class="mock"><span data-t="dev"></span><span class="toggle" aria-hidden="true"><i></i></span></div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="num">3</div>
+      <div class="body">
+        <h2 data-t="s3"></h2>
+        <p data-t="s3d"></p>
+        <div class="copy-row" id="pathRow"><code id="path"></code><button type="button" class="btn primary" id="copyPath" data-t="copy"></button></div>
+        <p class="hint" data-t="s3h"></p>
+      </div>
+    </li>
+    <li class="step done">
+      <div class="num">✓</div>
+      <div class="body">
+        <h2 data-t="s4"></h2>
+        <p data-t="s4d"></p>
+      </div>
+    </li>
+  </ol>
+  <p class="foot" data-t="foot"></p>
+</main>
+<div id="toast" class="toast" role="status" hidden></div>
+<script type="module" src="install.js?v=1"></script>
+</body>
+</html>

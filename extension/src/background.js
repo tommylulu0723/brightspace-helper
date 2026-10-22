@@ -8,6 +8,8 @@ import { buildPlan } from './lib/plan.js';
 import { unreadCount } from './lib/feed.js';
 import { VERSION_NOTES, REQUIRE_LOGIN } from './config.js';
 import { gateState } from './lib/gate.js';
+import { tr } from './lib/i18n.js';
+import { loadLang } from './lang.js';
 import { parseFirstNotes } from './lib/selfupdate.js';
 
 const ALARM = 'sync';
@@ -32,6 +34,21 @@ async function tabFetcher(url) {
 }
 
 const UPDATE_ALARM = 'self-update';
+
+// 通知和图标提示文字按界面语言翻译
+async function notify(id, opts) {
+  await loadLang();
+  return chrome.notifications.create(id, {
+    ...opts,
+    title: tr(opts.title),
+    message: String(opts.message || '').split('\n').map((l) => tr(l)).join('\n'),
+    ...(opts.buttons ? { buttons: opts.buttons.map((b) => ({ ...b, title: tr(b.title) })) } : {})
+  });
+}
+async function setTitleTr(o) {
+  await loadLang();
+  return chrome.action.setTitle({ ...o, title: tr(o.title) });
+}
 
 async function ensureAlarm() {
   const a = await chrome.alarms.get(ALARM);
@@ -73,20 +90,23 @@ async function checkSelfUpdate() {
   if (pendingUpdate?.to === disk.version) return pendingUpdate;
 
   let notes = [];
+  let notesEn = null;
   try {
     const n = parseFirstNotes(await readDisk('src/config.js'));
-    if (n && n.v === disk.version) notes = n.items;
+    if (n && n.v === disk.version) { notes = n.items; notesEn = n.en || null; }
   } catch { /* 没有更新说明也能更新 */ }
-  const pending = { from: running, to: disk.version, notes, at: new Date().toISOString() };
+  const pending = { from: running, to: disk.version, notes, notesEn, at: new Date().toISOString() };
+  const en = (await loadLang()) === 'en';
+  const shown = en && notesEn ? notesEn : notes;
   await chrome.storage.local.set({ pendingUpdate: pending });
 
   if (settings.autoApplyUpdate) { applyUpdate(); return pending; }
   refreshBadge();
-  chrome.notifications.create(`pending:${disk.version}`, {
+  notify(`pending:${disk.version}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
     title: `检测到更新：课程助手 ${disk.version}`,
-    message: notes.length ? notes.slice(0, 2).map((x) => `• ${x}`).join('\n') : `当前 ${running}，点"立即更新"几秒钟就好`,
+    message: shown.length ? shown.slice(0, 2).map((x) => `• ${x}`).join('\n') : `当前 ${running}，点"立即更新"几秒钟就好`,
     buttons: [{ title: '立即更新' }, { title: '稍后' }],
     requireInteraction: true,
     priority: 1
@@ -111,8 +131,8 @@ async function announceUpdate() {
   if (justUpdated.to && justUpdated.to !== v) return;
   let note = '';
   const n = VERSION_NOTES.find((x) => x.v === v);
-  if (n) note = n.items.slice(0, 2).map((x) => `• ${x}`).join('\n');
-  chrome.notifications.create(`updated:${v}`, {
+  if (n) note = ((await loadLang()) === 'en' && n.en ? n.en : n.items).slice(0, 2).map((x) => `• ${x}`).join('\n');
+  notify(`updated:${v}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
     title: `✓ 已更新到 ${v}`,
@@ -134,14 +154,14 @@ async function refreshBadge() {
     if (g.state !== 'ok') {
       await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
       await chrome.action.setBadgeText({ text: '!' });
-      await chrome.action.setTitle({ title: g.state === 'login' ? '课程助手：请先登录' : '课程助手：需要完成 Brightspace 姓名校验' });
+      await setTitleTr({ title: g.state === 'login' ? '课程助手：请先登录' : '课程助手：需要完成 Brightspace 姓名校验' });
       return;
     }
   }
   if (status.state === 'error' && status.error?.code === 'AUTH_REQUIRED') {
     await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
     await chrome.action.setBadgeText({ text: '!' });
-    await chrome.action.setTitle({ title: '课程助手：Brightspace 登录已过期，点开重新登录' });
+    await setTitleTr({ title: '课程助手：Brightspace 登录已过期，点开重新登录' });
     return;
   }
   const hidden = new Set(settings.hiddenCourseIds || []);
@@ -164,7 +184,7 @@ async function refreshBadge() {
   if (pendingUpdate) parts.push(`有新版本 ${pendingUpdate.to}`);
   if (n) parts.push(`${n} 项 48 小时内到期或已逾期`);
   if (unread) parts.push(`${unread} 条新动态`);
-  await chrome.action.setTitle({ title: parts.length ? `课程助手：${parts.join('，')}` : '课程助手' });
+  await setTitleTr({ title: parts.length ? `课程助手：${parts.join('，')}` : '课程助手' });
 }
 
 // 需要登录但还没登录 / 没通过姓名校验时：照常同步（要读 Brightspace 上的姓名），但不发通知
@@ -204,7 +224,7 @@ async function recordUpdates(prev, result) {
   const show = events.filter((e) => !hidden.has(e.courseId));
   if (!show.length) return;
   const lines = show.slice(0, 3).map((e) => describeUpdate(e, names[e.courseId], (d) => formatDue(d, now)));
-  chrome.notifications.create(`updates:${Date.now()}`, {
+  notify(`updates:${Date.now()}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
     title: show.length > 1 ? `Brightspace 有 ${show.length} 条新动态` : 'Brightspace 有新动态',
@@ -225,7 +245,7 @@ async function notifyDailyPlan(data) {
   await chrome.storage.local.set({ planNotifiedOn: today });
   if (!plan.length) return;
   const names = Object.fromEntries((data.courses || []).map((c) => [c.id, c.name]));
-  chrome.notifications.create(`plan:${today}`, {
+  notify(`plan:${today}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
     title: `今日计划 · ${plan.length} 件事`,
@@ -249,7 +269,7 @@ async function notifyDueSoon(data) {
     if (due <= t || due - t > 24 * 3600 * 1000) continue;
     if (isDone(it, overrides) || next[it.id] === it.due) continue;
     next[it.id] = it.due;
-    chrome.notifications.create(`due:${it.id}`, {
+    notify(`due:${it.id}`, {
       type: 'basic',
       iconUrl: chrome.runtime.getURL('icons/icon128.png'),
       title: '24 小时内到期',
@@ -264,7 +284,7 @@ async function notifyLoginExpired() {
   const { settings = {}, loginNotifiedAt } = await chrome.storage.local.get(['settings', 'loginNotifiedAt']);
   if (settings.notify === false) return;
   if (loginNotifiedAt && Date.now() - Date.parse(loginNotifiedAt) < 12 * 3600 * 1000) return;
-  chrome.notifications.create('login', {
+  notify('login', {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
     title: 'Brightspace 登录已过期',
@@ -308,6 +328,9 @@ async function cloudSync({ pushSnapshot = true } = {}) {
     try {
       await verifyIdentity();
       const me = await cloud.me(c.server, c.token);
+      // 提醒邮件用的语言跟插件一致
+      const want = st.settings?.lang || (await loadLang());
+      if (me.user && me.user.lang !== want) { try { me.user = (await cloud.updateProfile(c.server, c.token, { lang: want })).user; } catch { /* 下次再说 */ } }
       if (me.user?.verify?.status !== 'ok') {
         // 没通过姓名校验：服务器不收数据，只更新账号状态
         const { cloud: cur } = await chrome.storage.local.get('cloud');

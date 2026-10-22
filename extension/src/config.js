@@ -7,9 +7,22 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.4.0',
+    d: '2026-10-22',
+    items: [
+      '中英双语：设置 → 语言 里切换中文 / English，插件、通知、手机网页、提醒邮件都会跟着变',
+      '安装程序第一步先选语言；安装完成后打开安装引导网页（修复之前只跳到 Chrome 首页的问题）'
+    ],
+    en: [
+      'Chinese / English: switch in Settings → Language — the extension, notifications, mobile web and reminder emails all follow',
+      'The installer asks for your language first, and opens a setup guide when it\'s done (fixes it opening only the Chrome home page)'
+    ]
+  },
+  {
     v: '1.3.2',
     d: '2026-10-22',
-    items: ['注册页更醒目地提示：姓名必须和 Brightspace 上完全一致']
+    items: ['注册页更醒目地提示：姓名必须和 Brightspace 上完全一致'],
+    en: ['The sign-up page now clearly warns that your name must match Brightspace exactly']
   },
   {
     v: '1.3.1',
@@ -17,6 +30,10 @@ export const VERSION_NOTES = [
     items: [
       '账号系统上线：服务器 ddl.tommyxiaoshu.cn。第一次打开需要注册（First / Last name 要和 Brightspace 一致），通过姓名校验后就能用',
       '登录后可以在 设置 → 账号 里开关截止提醒邮件，手机上打开 ddl.tommyxiaoshu.cn/m/ 查看'
+    ],
+    en: [
+      'Accounts are live (server ddl.tommyxiaoshu.cn). Sign up the first time (first/last name must match Brightspace); you\'re in once the name check passes',
+      'Turn deadline reminder emails on or off in Settings → Account; on your phone, open ddl.tommyxiaoshu.cn/m/'
     ]
   },
   {
@@ -27,6 +44,12 @@ export const VERSION_NOTES = [
       '截止提醒邮件：截止前 24 小时和 3 小时，把还没交的作业 / 测验发到注册邮箱，电脑关机也照样发；设置 → 账号里可以开关、发测试邮件',
       '手机 / iPad 网页版：今日计划、截止时间、勾选完成、邮件提醒开关，可以"添加到主屏幕"像 App 一样用',
       'Windows 图形安装程序：可以选择安装位置，有进度条和完成页；Mac 安装也可以选位置'
+    ],
+    en: [
+      'Accounts: sign up with your first/last name, which must match Brightspace; each Brightspace account can link to only one Course Helper account',
+      'Deadline reminder emails 24 h and 3 h before anything you haven\'t submitted — even when your computer is off',
+      'Mobile / iPad web app: daily plan, deadlines, tick items off, reminder settings; add it to your home screen',
+      'Windows installer with a choice of install location; the Mac installer lets you pick a location too'
     ]
   },
   {

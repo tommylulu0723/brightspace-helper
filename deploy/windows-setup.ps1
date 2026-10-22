@@ -20,7 +20,8 @@
 param(
   [string]$Repo = 'tommylulu0723/brightspace-helper',
   [string]$Dir = '',
-  [switch]$NoChrome   # 图形安装向导调用时用：最后一步由向导自己显示
+  [switch]$NoChrome,  # 图形安装向导调用时用：最后一步由向导自己显示
+  [string]$Lang = ''  # zh / en：安装过程的提示语言，也作为插件的默认语言
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,13 +50,15 @@ function Default-Dir {
 if (-not $Dir) { $Dir = Find-Existing }
 if (-not $Dir) { $Dir = Default-Dir }
 
+if ($Lang -ne 'zh' -and $Lang -ne 'en') { $Lang = if ((Get-Culture).Name -like 'zh*') { 'zh' } else { 'en' } }
+function L($zh, $en) { if ($Lang -eq 'en') { $en } else { $zh } }
 function Ok($m) { Write-Host "✓ $m" -ForegroundColor Green }
 # 用 throw 而不是 exit：一行命令（irm | iex）安装时 exit 会把整个 PowerShell 窗口关掉
 function Fail($m) { Write-Host "✗ $m" -ForegroundColor Red; throw $m }
 
-Write-Host '课程助手 · 自动更新安装' -ForegroundColor Cyan
-Write-Host "仓库：github.com/$Repo"
-Write-Host "位置：$Dir"
+Write-Host (L '课程助手 · 自动更新安装' 'Course Helper · setup with auto-update') -ForegroundColor Cyan
+Write-Host ((L '仓库：' 'Repository: ') + "github.com/$Repo")
+Write-Host ((L '位置：' 'Location: ') + $Dir)
 Write-Host ''
 
 # 1. 找 git，没有就用 winget 装
@@ -69,32 +72,34 @@ function Find-Git {
 }
 $Git = Find-Git
 if (-not $Git) {
-  Write-Host '没找到 git，正在用 winget 安装 Git for Windows（可能会弹出确认窗口）…'
+  Write-Host (L '没找到 git，正在用 winget 安装 Git for Windows（可能会弹出确认窗口）…' 'Git not found — installing Git for Windows with winget (a confirmation window may appear)…')
   try {
     winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements --silent
   } catch {
-    Fail '自动安装失败。请到 https://git-scm.com/download/win 下载安装（全部默认选项），装完再运行一次这个脚本。'
+    Fail (L '自动安装失败。请到 https://git-scm.com/download/win 下载安装（全部默认选项），装完再运行一次这个脚本。' 'Automatic install failed. Download Git from https://git-scm.com/download/win (all default options), then run this again.')
   }
   $Git = Find-Git
-  if (-not $Git) { Fail 'Git 装好了但还找不到，请关掉 PowerShell 重新打开，再运行一次这个脚本。' }
+  if (-not $Git) { Fail (L 'Git 装好了但还找不到，请关掉 PowerShell 重新打开，再运行一次这个脚本。' 'Git was installed but can''t be found yet. Close this window, reopen it and run the installer again.') }
 }
-Ok "git 已就绪：$Git"
+Ok ((L 'git 已就绪：' 'Git ready: ') + $Git)
 
 # 2. 下载或更新代码（私有仓库第一次会弹浏览器让你登录 GitHub，登录一次之后就记住了）
 if (Test-Path (Join-Path $Dir '.git')) {
   & $Git -C $Dir pull --ff-only -q
-  if ($LASTEXITCODE -ne 0) { Fail '拉取失败，看看上面的错误信息' }
-  Ok '代码已是最新'
+  if ($LASTEXITCODE -ne 0) { Fail (L '拉取失败，看看上面的错误信息' 'Update failed — see the error above') }
+  Ok (L '代码已是最新' 'Already up to date')
 } else {
   if ((Test-Path $Dir) -and (Get-ChildItem $Dir -Force | Select-Object -First 1)) {
-    Fail "$Dir 已经存在而且不是空的，请换个位置：加上 -Dir ""D:\CourseHelper"""
+    Fail (L "$Dir 已经存在而且不是空的，请换个位置" "$Dir already exists and isn't empty — please choose another location")
   }
-  Write-Host '正在下载代码（私有仓库会弹出 GitHub 登录窗口，登录并授权即可）…'
+  Write-Host (L '正在下载课程助手…' 'Downloading Course Helper…')
   & $Git clone -q "https://github.com/$Repo.git" $Dir
-  if ($LASTEXITCODE -ne 0) { Fail '下载失败：检查仓库名，或者确认 GitHub 登录的是有权限的账号' }
-  Ok "代码已下载到 $Dir"
+  if ($LASTEXITCODE -ne 0) { Fail (L '下载失败：检查网络后再试' 'Download failed — check your network and try again') }
+  Ok ((L '已下载到 ' 'Downloaded to ') + $Dir)
 }
-if (-not (Test-Path (Join-Path $Dir 'extension\manifest.json'))) { Fail '仓库里没找到 extension\manifest.json，代码可能还没推上去' }
+if (-not (Test-Path (Join-Path $Dir 'extension\manifest.json'))) { Fail (L '仓库里没找到 extension\manifest.json' 'extension\manifest.json not found in the download') }
+# 插件的默认语言（不进 git，不会和更新冲突）
+try { [IO.File]::WriteAllText((Join-Path $Dir 'extension\lang.local.json'), "{""lang"":""$Lang""}", (New-Object Text.UTF8Encoding($false))) } catch { }
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 Set-Content -Path $LocFile -Value $Dir -Encoding UTF8
 
@@ -113,34 +118,34 @@ $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" 
 # 已经装过：先删掉旧任务再重建。旧任务如果是用"管理员"窗口建的，普通窗口删不掉，这时保留旧任务（它照样每分钟运行）
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
-  Ok '每 1 分钟自动检查更新：之前已经设置好了，保留原来的任务'
+  Ok (L '自动更新：之前已经设置好了，保留原来的任务' 'Auto-update: already set up, keeping the existing task')
 } else {
   try {
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($every, $logon) -Settings $settings -Principal $principal -Description '每 15 秒从 GitHub 拉取课程助手的新版本' -ErrorAction Stop | Out-Null
     Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    Ok '每 15 秒自动检查更新（开机登录后也会自动运行）'
+    Ok (L '每 15 秒自动检查更新（开机登录后也会自动运行）' 'Checks for updates every 15 seconds (also after you log in to Windows)')
   } catch {
-    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { Ok '每 1 分钟自动检查更新：之前已经设置好了，保留原来的任务' }
-    else { Fail "设置自动更新任务失败：$_" }
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { Ok (L '自动更新：之前已经设置好了，保留原来的任务' 'Auto-update: already set up, keeping the existing task') }
+    else { Fail ((L '设置自动更新任务失败：' 'Couldn''t set up the auto-update task: ') + $_) }
   }
 }
 
 $ExtDir = Join-Path $Dir 'extension'
-if ($NoChrome) { Ok "安装完成：$ExtDir"; return }
+if ($NoChrome) { Ok ((L '安装完成：' 'Installed: ') + $ExtDir); return }
 try { Set-Clipboard -Value $ExtDir } catch { }
 
 # 找 Chrome，直接打开扩展程序页面
 $Chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 
+$Guide = "https://ddl.tommyxiaoshu.cn/install/?lang=$Lang&os=win&path=$([uri]::EscapeDataString($ExtDir))"
 Write-Host ''
-Write-Host '================ 最后一步（只需要一次，约 20 秒）================' -ForegroundColor Cyan
-Write-Host '已经帮你打开 Chrome 的扩展程序页面，并把插件文件夹的位置复制好了：'
-Write-Host '  1. 打开右上角的"开发者模式"开关'
-Write-Host '  2. 点左上角"加载已解压的扩展程序"'
-Write-Host '  3. 在弹出窗口顶部的地址栏按 Ctrl+V，回车，再点"选择文件夹"'
-Write-Host "     （文件夹位置：$ExtDir）"
-Write-Host '  以前装过旧的"课程助手"的话，先把旧的移除。'
+Write-Host (L '================ 最后一步（只需要一次，约 20 秒）================' '================ Last step (only once, ~20 seconds) ================') -ForegroundColor Cyan
+Write-Host (L '已经在 Chrome 里打开安装引导，插件文件夹的位置也复制好了：' 'A setup guide has opened in Chrome, and the extension folder path is copied:')
+Write-Host (L '  1. Chrome 地址栏打开 chrome://extensions ，打开右上角的"开发者模式"' '  1. Open chrome://extensions and turn on "Developer mode" (top right)')
+Write-Host (L '  2. 点左上角"加载已解压的扩展程序"' '  2. Click "Load unpacked" (top left)')
+Write-Host (L '  3. 在弹出窗口顶部的地址栏按 Ctrl+V，回车，再点"选择文件夹"' '  3. Press Ctrl+V in the address bar at the top of the dialog, Enter, then "Select Folder"')
+Write-Host ((L '     （文件夹位置：' '     (folder: ') + $ExtDir + (L '）' ')'))
 Write-Host ''
-Write-Host '装好之后有新版本时，插件会弹出"检测到更新"，点"立即更新"就好，永远不用重装。' -ForegroundColor Green
-Write-Host "（Chrome 规定插件只能由你自己点"加载"，脚本没法替你点这一下）"
-if ($Chrome) { Start-Process $Chrome 'chrome://extensions/' } else { Write-Host '没找到 Chrome，请自己打开 Chrome，在地址栏输入 chrome://extensions' -ForegroundColor Yellow }
+Write-Host (L '装好之后有新版本时，插件会弹出"检测到更新"，点"立即更新"就好，永远不用重装。' 'After that, new versions show "Update available" in the extension — click "Update now". No reinstalling.') -ForegroundColor Green
+# Chrome 不允许别的程序直接打开 chrome://extensions（只会打开首页），所以打开安装引导网页
+if ($Chrome) { Start-Process $Chrome $Guide } else { Start-Process $Guide }

@@ -3,6 +3,7 @@ import { h, fill, add, icon, I, toast } from './ui.js';
 import { cloud, normalizeServer } from '../lib/cloud.js';
 import { DEFAULT_SERVER } from '../config.js';
 import { BASE_URL } from '../lib/api.js';
+import { getLang } from '../lib/i18n.js';
 
 let mode = 'login';
 let lastKey = '';
@@ -67,7 +68,7 @@ function authForm(ctx) {
     try {
       const body = { email: f.get('email'), password: f.get('password') };
       const r = reg
-        ? await cloud.register(url, { ...body, firstName: f.get('firstName'), lastName: f.get('lastName'), invite: f.get('invite') })
+        ? await cloud.register(url, { ...body, firstName: f.get('firstName'), lastName: f.get('lastName'), invite: f.get('invite'), lang: getLang() })
         : await cloud.login(url, body);
       await ctx.store.set({ cloud: { server: url, token: r.token, user: r.user, flags: r.flags || {}, error: null } });
       toast(reg ? `注册成功，正在和 Brightspace 核对姓名…` : `欢迎回来，${r.user.firstName || r.user.name}`);

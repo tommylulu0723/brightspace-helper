@@ -53,6 +53,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     id: u.id, email: u.email, name: u.name, firstName: u.firstName || '', lastName: u.lastName || '', role: u.role, createdAt: u.createdAt,
     verify: u.verify || { status: 'pending' },
     reminders: { h24: u.reminders?.h24 !== false, h3: u.reminders?.h3 !== false },
+    lang: u.lang === 'en' ? 'en' : 'zh',
     mustChangePassword: !!u.mustChangePassword
   });
   const verified = (u) => u.verify?.status === 'ok';
@@ -196,7 +197,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
           sent: st.reminded || {}, prefs: u.reminders || {}, now, isDone
         });
         if (!picks.length) continue;
-        const mail = buildReminderEmail({ name: u.firstName || u.name, picks, now, siteUrl: siteUrl(), snapshotAt: st.snapshotAt || 0 });
+        const mail = buildReminderEmail({ name: u.firstName || u.name, picks, now, siteUrl: siteUrl(), snapshotAt: st.snapshotAt || 0, lang: u.lang });
         try {
           await deliver(u.email, mail, { kind: 'reminder', userId: u.id });
           const fresh = db.readState(u.id); // 发信期间插件可能刚上传过，重新读一次再写
@@ -268,7 +269,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     const now = new Date().toISOString();
     const u = {
       id: newId('u'), email, name, firstName, lastName, role: first || admins.has(email) ? 'admin' : 'user',
-      verify: { status: 'pending' }, reminders: { h24: true, h3: true },
+      verify: { status: 'pending' }, reminders: { h24: true, h3: true }, lang: body.lang === 'en' ? 'en' : 'zh',
       passwordHash: hashPassword(password), disabled: false, createdAt: now, lastSeenAt: now, lastSyncAt: null,
       invitedWith: invite ? invite.code : null
     };
@@ -316,6 +317,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       user.name = displayName(f, l);
       user.verify = { status: 'pending' };
     }
+    if (body.lang === 'en' || body.lang === 'zh') user.lang = body.lang;
     if (body.reminders && typeof body.reminders === 'object') {
       user.reminders = { h24: body.reminders.h24 !== false, h3: body.reminders.h3 !== false };
     }
@@ -361,10 +363,16 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     if (!verified(user)) throw new HttpError(403, '先完成 Brightspace 姓名校验', 'NOT_VERIFIED');
     if (!smtpConfigured(mailCfg())) throw new HttpError(503, '管理员还没设置发信邮箱，暂时发不了邮件', 'MAIL_OFF');
     if (!testLimit(`test:${user.id}`)) throw new HttpError(429, '一小时最多发 3 封测试邮件');
-    await deliver(user.email, {
+    const en = user.lang === 'en';
+    const safe = user.name.replace(/[<>&]/g, '');
+    await deliver(user.email, en ? {
+      subject: 'Course Helper: test email',
+      text: `Hi ${user.name},\n\nIf you got this, deadline reminders can reach this inbox. Course Helper emails you 24 hours and 3 hours before anything you haven't submitted.\n\n— Course Helper`,
+      html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6"><p>Hi ${safe},</p><p>If you got this, deadline reminders can reach this inbox. Course Helper emails you 24 hours and 3 hours before anything you haven't submitted.</p><p style="color:#6b7280">— Course Helper</p></div>`
+    } : {
       subject: '课程助手：测试邮件',
       text: `${user.name}，你好：\n\n收到这封邮件说明截止提醒能正常发到这个邮箱。截止前 24 小时和 3 小时，课程助手会把还没交的作业 / 测验发到这里。\n\n—— 课程助手`,
-      html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6"><p>${user.name.replace(/[<>&]/g, '')}，你好：</p><p>收到这封邮件说明截止提醒能正常发到这个邮箱。截止前 24 小时和 3 小时，课程助手会把还没交的作业 / 测验发到这里。</p><p style="color:#6b7280">—— 课程助手</p></div>`
+      html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6"><p>${safe}，你好：</p><p>收到这封邮件说明截止提醒能正常发到这个邮箱。截止前 24 小时和 3 小时，课程助手会把还没交的作业 / 测验发到这里。</p><p style="color:#6b7280">—— 课程助手</p></div>`
     }, { kind: 'test', userId: user.id });
     return { ok: true };
   });
@@ -641,7 +649,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       roots = SHARED_LIB;
     } else {
       if (pathname === '/' || pathname === '') { res.writeHead(302, { location: '/m/' }); res.end(); return true; }
-      if (pathname === '/admin' || pathname === '/m') { res.writeHead(302, { location: `${pathname}/` }); res.end(); return true; }
+      if (pathname === '/admin' || pathname === '/m' || pathname === '/install') { res.writeHead(302, { location: `${pathname}/` }); res.end(); return true; }
       rel = pathname === '/favicon.ico' ? 'favicon.svg' : pathname.endsWith('/') ? `${pathname.slice(1)}index.html` : pathname.slice(1);
       roots = [PUBLIC];
     }

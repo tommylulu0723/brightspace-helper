@@ -16,6 +16,8 @@ import { averagePct, gradeTone } from '../lib/extras.js';
 import { gateState } from '../lib/gate.js';
 import { renderGate, resetGate } from './gate.js';
 import { REQUIRE_LOGIN } from '../config.js';
+import { loadLang } from '../lang.js';
+import { translatePage, getLang, setLang } from '../lib/i18n.js';
 
 const store = createStore();
 const $ = (id) => document.getElementById(id);
@@ -154,7 +156,7 @@ function renderBanner() {
     fill(a,
       h('span', { class: 'up-text' },
         h('strong', {}, `检测到更新：${up.from} → ${up.to}`),
-        up.notes?.length ? h('span', {}, up.notes.slice(0, 3).join('；')) : null),
+        up.notes?.length ? h('span', {}, ((getLang() === 'en' && up.notesEn) || up.notes).slice(0, 3).join(getLang() === 'en' ? '; ' : '；')) : null),
       h('button', { type: 'button', class: 'btn small primary', onClick: (e) => { e.target.disabled = true; e.target.textContent = '正在更新…'; store.applyUpdate(); setTimeout(() => location.reload(), 2500); } }, '立即更新'));
     a.hidden = false;
   } else {
@@ -722,7 +724,14 @@ window.addEventListener('hashchange', () => {
   if (VIEWS.includes(v) && v !== ui.view) setView(v);
 });
 
-store.onChanged(load);
+// 演示模式（直接打开 html）可以用 ?lang=en 预览英文
+const LANG = store.demo ? (setLang(new URLSearchParams(location.search).get('lang') || 'zh'), getLang()) : await loadLang();
+translatePage(document.body);
+store.onChanged((ch) => {
+  // 在别处（比如另一个标签页）切换了语言：整页重新加载
+  if (ch?.settings && (ch.settings.newValue?.lang || 'x') !== (ch.settings.oldValue?.lang || 'x') && ch.settings.newValue?.lang && ch.settings.newValue.lang !== LANG) { location.reload(); return; }
+  load();
+});
 store.checkUpdate?.();
 setInterval(() => { if (ui.view !== 'settings') render(); }, 60 * 1000);
 load();
