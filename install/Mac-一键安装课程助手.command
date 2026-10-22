@@ -6,7 +6,7 @@ echo "----------------------------------------"
 if [ -f ./mac-setup.sh ]; then
   bash ./mac-setup.sh
 else
-  curl -fsSL https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/mac-setup.sh -o /tmp/course-helper-setup.sh \
+  curl -fsSL -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/tommylulu0723/brightspace-helper/contents/deploy/mac-setup.sh?ref=main&t=$(date +%s)" -o /tmp/course-helper-setup.sh \
     && bash /tmp/course-helper-setup.sh
 fi
 echo

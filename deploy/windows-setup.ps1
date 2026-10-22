@@ -7,7 +7,7 @@
 # 之后有新版本时，插件会在 1–2 分钟内自己重新加载并弹通知。
 #
 # 朋友安装（仓库公开时，一行命令，不用下载文件）：
-#   iex ((irm https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/windows-setup.ps1).TrimStart([char]0xFEFF))
+#   $u='https://api.github.com/repos/tommylulu0723/brightspace-helper/contents/deploy/windows-setup.ps1?ref=main&t='+[DateTime]::Now.Ticks; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((irm $u -Headers @{'User-Agent'='course-helper'}).content)); iex $s.TrimStart([char]0xFEFF)
 # 用法（下载了这个文件时，在 PowerShell 里粘贴运行）：
 #   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\windows-setup.ps1"
 # 换安装位置：
@@ -75,7 +75,10 @@ if (-not (Test-Path (Join-Path $Dir 'extension\manifest.json'))) { Fail '仓库�
 # 3. 每分钟自动拉取：任务计划程序 + conhost --headless（后台运行，不会每分钟闪一个黑窗口）
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 # 后台拉取时不弹登录窗口（登录过期就跳过，日志里会记一笔）
-$inner = "set ""GCM_INTERACTIVE=never"" && set ""GIT_TERMINAL_PROMPT=0"" && cd /d ""$Dir"" && ""$Git"" pull --ff-only -q >> ""$Log"" 2>&1"
+# 任务计划程序最快只能每分钟运行一次，所以每次运行里拉 4 次（间隔 15 秒），新版本十几秒内就能拉下来
+$pull = """$Git"" pull --ff-only -q >> ""$Log"" 2>&1"
+$wait = 'ping -n 16 127.0.0.1 >nul'
+$inner = "set ""GCM_INTERACTIVE=never"" && set ""GIT_TERMINAL_PROMPT=0"" && cd /d ""$Dir"" && ($pull & $wait & $pull & $wait & $pull & $wait & $pull)"
 $action = New-ScheduledTaskAction -Execute "$env:WINDIR\System32\conhost.exe" -Argument "--headless cmd.exe /c ""$inner"""
 $every = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 3650)
 $logon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
@@ -87,9 +90,9 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
   Ok '每 1 分钟自动检查更新：之前已经设置好了，保留原来的任务'
 } else {
   try {
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($every, $logon) -Settings $settings -Principal $principal -Description '每分钟从 GitHub 拉取课程助手的新版本' -ErrorAction Stop | Out-Null
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($every, $logon) -Settings $settings -Principal $principal -Description '每 15 秒从 GitHub 拉取课程助手的新版本' -ErrorAction Stop | Out-Null
     Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    Ok '每 1 分钟自动检查更新（开机登录后也会自动运行）'
+    Ok '每 15 秒自动检查更新（开机登录后也会自动运行）'
   } catch {
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { Ok '每 1 分钟自动检查更新：之前已经设置好了，保留原来的任务' }
     else { Fail "设置自动更新任务失败：$_" }

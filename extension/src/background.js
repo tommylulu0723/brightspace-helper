@@ -37,8 +37,9 @@ async function ensureAlarm() {
   if (!a || a.periodInMinutes !== PERIOD_MIN) {
     await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: PERIOD_MIN });
   }
+  // Chrome 允许的最短间隔是 30 秒；每次闹钟查两次（隔 15 秒），新版本拉下来后十几秒内就会弹"检测到更新"
   const u = await chrome.alarms.get(UPDATE_ALARM);
-  if (!u) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 1 });
+  if (!u || u.periodInMinutes !== 0.5) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 0.5, periodInMinutes: 0.5 });
 }
 
 // ---------------- 热更新 ----------------
@@ -377,7 +378,7 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === UPDATE_ALARM) checkSelfUpdate();
+  if (a.name === UPDATE_ALARM) { checkSelfUpdate(); setTimeout(checkSelfUpdate, 15000); }
   if (a.name === ALARM) syncNow('alarm');
 });
 

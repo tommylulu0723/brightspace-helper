@@ -1,6 +1,6 @@
-# 用 GitHub 热更新课程助手（每 1 分钟检查一次）
+# 用 GitHub 热更新课程助手（十几秒内生效）
 
-设置好之后：新版本推到 GitHub → 电脑每分钟自动拉取 → 插件弹出"检测到更新 x.x.x"（系统通知 + 插件里的绿色横幅，图标显示绿色 NEW）→ 点"立即更新"几秒钟就换成新版本。设置 → 通知 里打开"自动安装插件更新"就连点都不用点。
+设置好之后：新版本推到 GitHub → 电脑每 15 秒自动拉取 → 插件弹出"检测到更新 x.x.x"（系统通知 + 插件里的绿色横幅，图标显示绿色 NEW）→ 点"立即更新"几秒钟就换成新版本。设置 → 通知 里打开"自动安装插件更新"就连点都不用点。
 
 ## 分享给朋友（一劳永逸）
 
@@ -9,13 +9,13 @@
 **Windows**：打开 PowerShell，粘贴回车：
 
 ```powershell
-iex ((irm https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/windows-setup.ps1).TrimStart([char]0xFEFF))
+$u='https://api.github.com/repos/tommylulu0723/brightspace-helper/contents/deploy/windows-setup.ps1?ref=main&t='+[DateTime]::Now.Ticks; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((irm $u -Headers @{'User-Agent'='course-helper'}).content)); iex $s.TrimStart([char]0xFEFF)
 ```
 
 **Mac**：打开终端，粘贴回车（问令牌时直接回车）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/mac-setup.sh | bash
+curl -fsSL -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/tommylulu0723/brightspace-helper/contents/deploy/mac-setup.sh?ref=main&t=$(date +%s)" | bash
 ```
 
 然后在 Chrome 加载脚本最后提示的 `CourseHelper\extension` 文件夹。以后你每发一个新版本，所有朋友的插件都会弹"检测到更新"。

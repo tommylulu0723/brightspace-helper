@@ -9,7 +9,7 @@
 #
 # 用法：在"终端"里运行  bash ~/Downloads/mac-setup.sh
 # 朋友安装（仓库公开时，一行命令）：
-#   curl -fsSL https://raw.githubusercontent.com/tommylulu0723/brightspace-helper/main/deploy/mac-setup.sh | bash
+#   curl -fsSL -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/tommylulu0723/brightspace-helper/contents/deploy/mac-setup.sh?ref=main&t=$(date +%s)" | bash
 # 卸载：bash ~/CourseHelper/deploy/mac-uninstall.sh
 
 set -e
@@ -75,7 +75,7 @@ cat > "$PLIST" <<PLISTEOF
     <string>-c</string>
     <string>cd "$DIR" &amp;&amp; /usr/bin/git pull --ff-only -q 2&gt;&gt; "$LOG" || echo "\$(date '+%F %T') 拉取失败" &gt;&gt; "$LOG"</string>
   </array>
-  <key>StartInterval</key><integer>60</integer>
+  <key>StartInterval</key><integer>15</integer>
   <key>RunAtLoad</key><true/>
   <key>ProcessType</key><string>Background</string>
   <key>LowPriorityIO</key><true/>
@@ -84,7 +84,7 @@ cat > "$PLIST" <<PLISTEOF
 PLISTEOF
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-ok "每 1 分钟自动检查更新（开机后也会自动运行）"
+ok "每 15 秒自动检查更新（开机后也会自动运行）"
 
 printf "%s" "$DIR/extension" | pbcopy 2>/dev/null || true
 open -a "Google Chrome" "chrome://extensions/" 2>/dev/null || echo "没找到 Chrome，请自己打开 Chrome，在地址栏输入 chrome://extensions"
