@@ -86,12 +86,21 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($every, $l
 Start-ScheduledTask -TaskName $TaskName
 Ok '每 1 分钟自动检查更新（开机登录后也会自动运行）'
 
+$ExtDir = Join-Path $Dir 'extension'
+try { Set-Clipboard -Value $ExtDir } catch { }
+
+# 找 Chrome，直接打开扩展程序页面
+$Chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+
 Write-Host ''
-Write-Host '最后一步：在 Chrome 里加载插件（只需要一次）' -ForegroundColor Cyan
-Write-Host '  1. Chrome 打开 chrome://extensions ，把旧的"课程助手"移除'
-Write-Host '  2. 右上角打开"开发者模式"，点"加载已解压的扩展程序"'
-Write-Host "  3. 选这个文件夹：$Dir\extension"
+Write-Host '================ 最后一步（只需要一次，约 20 秒）================' -ForegroundColor Cyan
+Write-Host '已经帮你打开 Chrome 的扩展程序页面，并把插件文件夹的位置复制好了：'
+Write-Host '  1. 打开右上角的"开发者模式"开关'
+Write-Host '  2. 点左上角"加载已解压的扩展程序"'
+Write-Host '  3. 在弹出窗口顶部的地址栏按 Ctrl+V，回车，再点"选择文件夹"'
+Write-Host "     （文件夹位置：$ExtDir）"
+Write-Host '  以前装过旧的"课程助手"的话，先把旧的移除。'
 Write-Host ''
-Write-Host '之后有新版本时，插件会弹出"检测到更新"，点"立即更新"就好，不用重新安装。'
-Write-Host "更新记录：$Log"
-Start-Process explorer.exe (Join-Path $Dir 'extension')
+Write-Host '装好之后有新版本时，插件会弹出"检测到更新"，点"立即更新"就好，永远不用重装。' -ForegroundColor Green
+Write-Host "（Chrome 规定插件只能由你自己点"加载"，脚本没法替你点这一下）"
+if ($Chrome) { Start-Process $Chrome 'chrome://extensions/' } else { Write-Host '没找到 Chrome，请自己打开 Chrome，在地址栏输入 chrome://extensions' -ForegroundColor Yellow }

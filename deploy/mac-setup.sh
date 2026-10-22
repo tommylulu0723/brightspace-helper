@@ -86,13 +86,17 @@ launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 ok "每 1 分钟自动检查更新（开机后也会自动运行）"
 
+printf "%s" "$DIR/extension" | pbcopy 2>/dev/null || true
+open -a "Google Chrome" "chrome://extensions/" 2>/dev/null || echo "没找到 Chrome，请自己打开 Chrome，在地址栏输入 chrome://extensions"
+
 echo
-bold "最后一步：在 Chrome 里加载插件（只需要一次）"
-echo "  1. Chrome 打开 chrome://extensions ，把旧的"课程助手"移除"
-echo "  2. 右上角打开"开发者模式"，点"加载已解压的扩展程序""
-echo "  3. 选这个文件夹： $DIR/extension"
-echo "     （在选择窗口里按 Cmd+Shift+G，粘贴上面的路径，回车）"
+bold "================ 最后一步（只需要一次，约 20 秒）================"
+echo "已经帮你打开 Chrome 的扩展程序页面，并把插件文件夹的位置复制好了："
+echo "  1. 打开右上角的「开发者模式」开关"
+echo "  2. 点左上角「加载已解压的扩展程序」"
+echo "  3. 在弹出窗口里按 Cmd+Shift+G，再按 Cmd+V 粘贴，回车，点「选择」"
+echo "     （文件夹位置：$DIR/extension）"
+echo "  以前装过旧的「课程助手」的话，先把旧的移除。"
 echo
-echo "之后有新版本时，插件会弹出\"检测到更新\"，点\"立即更新\"就好。"
-echo "查看更新记录：cat $LOG"
-open "$DIR" 2>/dev/null || true
+echo "装好之后有新版本时，插件会弹出「检测到更新」，点「立即更新」就好，永远不用重装。"
+echo "（Chrome 规定插件只能由你自己点「加载」，脚本没法替你点这一下）"
