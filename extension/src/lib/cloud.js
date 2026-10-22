@@ -104,6 +104,6 @@ export function mergeState(local, remote) {
 
 /** 要同步到服务器的设置（白名单） */
 export function publicSettings(settings = {}) {
-  const { hiddenCourseIds, addedCourseIds, notify, lang } = settings;
-  return { hiddenCourseIds, addedCourseIds, notify, lang };
+  const { hiddenCourseIds, addedCourseIds, notify, lang, customItems } = settings;
+  return { hiddenCourseIds, addedCourseIds, notify, lang, customItems };
 }

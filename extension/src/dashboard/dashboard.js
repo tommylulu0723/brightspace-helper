@@ -14,6 +14,8 @@ import { buildFeed, FEED_FILTERS } from '../lib/feed.js';
 import { UPDATE_KINDS } from '../lib/changes.js';
 import { averagePct, gradeTone } from '../lib/extras.js';
 import { gateState, isBlocking } from '../lib/gate.js';
+import { withCustom, upsertCustom, removeCustom, pruneCustom, MINE, CUSTOM_TYPES } from '../lib/custom.js';
+import { cloud as cloudApi } from '../lib/cloud.js';
 import { renderGate, resetGate } from './gate.js';
 import { REQUIRE_LOGIN } from '../config.js';
 import { loadLang } from '../lang.js';
@@ -57,7 +59,7 @@ function ctxFor(now) {
     now,
     courses: list,
     colors: courseColorMap(state.data?.courses || []),
-    names: Object.fromEntries((state.data?.allCourses || state.data?.courses || []).map((c) => [c.id, c.name])),
+    names: Object.fromEntries([...(state.data?.allCourses || []), ...(state.data?.courses || [])].map((c) => [c.id, c.name])),
     items: (state.data?.items || []).filter((it) => ids.has(it.courseId))
   };
 }
@@ -304,6 +306,7 @@ function renderRow(it, { now, colors, names }) {
   const tone = done ? 'neutral' : g === 'overdue' ? 'danger' : g === 'today' || g === 'tomorrow' ? 'warn' : 'neutral';
   const cc = colors[it.courseId] || '#888';
   let status = null;
+  const mine = it.custom ? h('span', { class: 'chip accent' }, '我添加的') : null;
   if (done) status = h('span', { class: 'chip ok' }, manual ? '手动标记完成' : it.status === 'submitted' ? '已提交' : '已完成');
   else if (g === 'unverified') status = h('span', { class: 'chip neutral' }, '待确认');
   return h('div', { class: `row${done ? ' done' : ''}` },
@@ -313,14 +316,79 @@ function renderRow(it, { now, colors, names }) {
       onClick: () => setDone(it, !done)
     }, icon(I.check, 14)),
     h('div', { class: 'body' },
-      it.url ? h('a', { class: 'title', href: it.url, target: '_blank', rel: 'noopener' }, it.title) : h('span', { class: 'title' }, it.title),
+      it.url ? h('a', { class: 'title', href: it.url, target: '_blank', rel: 'noopener' }, it.title)
+        : it.custom ? h('button', { type: 'button', class: 'title link-title', title: '编辑', onClick: () => customDialog(it) }, it.title)
+        : h('span', { class: 'title' }, it.title),
       h('div', { class: 'meta' },
         h('span', { class: 'course-tag', style: `--cc:${cc}` }, names[it.courseId] || ''),
         h('span', {}, TYPE_LABEL[it.type] || '其他'),
-        status)),
+        mine, status),
+      it.custom && it.note ? h('div', { class: 'note' }, it.note) : null),
     h('div', { class: 'due' },
       h('span', { class: `chip ${tone}` }, formatDue(it.due, now)),
       done || g === 'unverified' ? null : h('span', { class: 'rel' }, formatRelative(it.due, now))));
+}
+
+// ---------------- 自己添加截止事项 ----------------
+const pad2 = (n) => String(n).padStart(2, '0');
+function customDialog(existing = null) {
+  const raw = existing ? (state.settings.customItems || []).find((x) => x.id === existing.id) : null;
+  const d = raw ? new Date(raw.due) : (() => { const x = new Date(Date.now() + 24 * 3600e3); x.setHours(23, 59, 0, 0); return x; })();
+  const courses = (state.data?.courses || []).filter((c) => c.id !== MINE && !c.hidden && !(state.settings?.hiddenCourseIds || []).includes(c.id));
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  const typeSel = h('select', { name: 'type' }, ...CUSTOM_TYPES.map((t) => h('option', { value: t, selected: (raw?.type || 'presentation') === t }, TYPE_LABEL[t])));
+  const courseSel = h('select', { name: 'courseId' },
+    h('option', { value: MINE }, '我的事项（不属于某门课）'),
+    ...courses.map((c) => h('option', { value: c.id, selected: raw?.courseId === c.id || (!raw && ui.course === c.id) }, c.name)));
+  const form = h('form', { method: 'dialog', class: 'custom-form' },
+    h('h2', {}, raw ? '编辑截止事项' : '添加截止事项'),
+    h('p', { class: 'hint' }, '比如 presentation、小组讨论、自己定的 deadline。会和 Brightspace 的截止时间一起显示、提醒，也会同步到手机和提醒邮件。'),
+    h('label', { class: 'field' }, h('span', {}, '标题'), h('input', { name: 'title', required: true, maxlength: 120, value: raw?.title || '', placeholder: '例如 Final presentation' })),
+    h('div', { class: 'grid2' },
+      h('label', { class: 'field' }, h('span', {}, '类型'), typeSel),
+      h('label', { class: 'field' }, h('span', {}, '课程'), courseSel)),
+    h('div', { class: 'grid2' },
+      h('label', { class: 'field' }, h('span', {}, '日期'), h('input', { name: 'date', type: 'date', required: true, value: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` })),
+      h('label', { class: 'field' }, h('span', {}, '时间'), h('input', { name: 'time', type: 'time', required: true, value: `${pad2(d.getHours())}:${pad2(d.getMinutes())}` }))),
+    h('label', { class: 'field' }, h('span', {}, '备注（可选）'), h('textarea', { name: 'note', rows: 2, maxlength: 500, placeholder: '例如 第 3 组，10 分钟' }, raw?.note || '')),
+    err,
+    h('div', { class: 'dialog-actions' },
+      raw ? h('button', { type: 'button', class: 'btn danger left', onClick: async () => {
+        await saveCustom(removeCustom(state.settings.customItems, raw.id));
+        dlg.close(); toast('已删除');
+      } }, '删除') : null,
+      h('button', { type: 'button', class: 'btn', onClick: () => dlg.close() }, '取消'),
+      h('button', { type: 'submit', class: 'btn primary' }, '保存')));
+  const dlg = h('dialog', { class: 'dialog' }, form);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = new FormData(form);
+    const title = String(f.get('title') || '').trim();
+    const due = new Date(`${f.get('date')}T${f.get('time') || '23:59'}`);
+    if (!title) { err.textContent = '先写个标题'; return; }
+    if (!Number.isFinite(due.getTime())) { err.textContent = '日期或时间不对'; return; }
+    const list = upsertCustom(pruneCustom(state.settings.customItems || []), { ...(raw || {}), title, type: f.get('type'), courseId: f.get('courseId'), due, note: f.get('note') });
+    await saveCustom(list);
+    dlg.close();
+    toast(raw ? '已保存' : `已添加：${title}`);
+  });
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg);
+  dlg.showModal();
+  form.querySelector('input[name=title]').focus();
+}
+
+async function saveCustom(list) {
+  await store.set({ settings: { ...(state.settings || {}), customItems: list }, settingsAt: Date.now() });
+}
+
+// ---------------- 主页的语言切换 ----------------
+async function switchLang(l) {
+  if (l === getLang()) return;
+  await store.set({ settings: { ...(state.settings || {}), lang: l }, settingsAt: Date.now() });
+  const c = state.cloud;
+  if (c?.token) { try { await cloudApi.updateProfile(c.server, c.token, { lang: l }); } catch { /* 下次同步再改 */ } }
+  location.reload();
 }
 
 // ---------------- 课件库 ----------------
@@ -721,7 +789,7 @@ function openSettings(sectionId) {
 async function load() {
   const got = await store.get(KEYS);
   state = {
-    data: got.data || null, status: got.status || {}, overrides: got.overrides || {}, settings: got.settings || {},
+    data: withCustom(got.data || null, got.settings || {}), status: got.status || {}, overrides: got.overrides || {}, settings: got.settings || {},
     cloud: got.cloud || null, updates: got.updates || [], seenAt: got.seenAt || 0,
     pendingUpdate: got.pendingUpdate || null
   };
@@ -736,6 +804,8 @@ $('accountBtn').addEventListener('click', () => (ui.view === 'settings' ? setVie
 $('manageCourses').addEventListener('click', () => openSettings('courses'));
 $('syncBtn').addEventListener('click', () => doSync());
 $('icsBtn').addEventListener('click', exportIcs);
+$('addBtn').addEventListener('click', () => customDialog());
+for (const b of document.querySelectorAll('#langMini [data-lang]')) b.addEventListener('click', () => switchLang(b.dataset.lang));
 $('matRefresh').addEventListener('click', () => { toast('正在重新读取所有课程的课件…'); doSync({ forceMaterials: true }); });
 $('hideDone').addEventListener('change', (e) => { ui.hideDone = e.target.checked; saveUi(); render(); });
 $('lectureOnly').addEventListener('change', (e) => { ui.lectureOnly = e.target.checked; saveUi(); render(); });
@@ -748,6 +818,7 @@ window.addEventListener('hashchange', () => {
 
 // 演示模式（直接打开 html）可以用 ?lang=en 预览英文
 const LANG = store.demo ? (setLang(new URLSearchParams(location.search).get('lang') || 'zh'), getLang()) : await loadLang();
+for (const b of document.querySelectorAll('#langMini [data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === getLang()));
 translatePage(document.body);
 store.onChanged((ch) => {
   // 在别处（比如另一个标签页）切换了语言：整页重新加载

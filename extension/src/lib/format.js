@@ -2,7 +2,7 @@
 import { isDoneStatus } from './merge.js';
 
 export const TYPE_LABEL = {
-  assignment: '作业', quiz: '测验', exam: '考试', discussion: '讨论', event: '日程', other: '其他'
+  assignment: '作业', quiz: '测验', exam: '考试', presentation: '展示', discussion: '讨论', event: '日程', other: '其他'
 };
 
 export const COURSE_COLORS = ['#7C3AED', '#2563EB', '#EA580C', '#0D9488', '#CA8A04', '#DB2777', '#0891B2', '#65A30D'];

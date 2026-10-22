@@ -6,7 +6,7 @@ export const PLAN_WINDOW_H = 72;          // 截止前 3 天开始出现在计�
 export const EXAM_WINDOW_H = 7 * 24;      // 考试提前 7 天开始复习
 
 // 越重要的类型系数越大：同样还剩 72 小时，考试会排在作业前面
-const WEIGHT = { exam: 3, assignment: 1.5, quiz: 1.5, discussion: 1, event: 1, other: 1 };
+const WEIGHT = { exam: 3, presentation: 2.5, assignment: 1.5, quiz: 1.5, discussion: 1, event: 1, other: 1 };
 
 function startOfDay(t) {
   const d = new Date(t);
@@ -18,6 +18,11 @@ export function planReason(it, now = new Date()) {
   const ms = Date.parse(it.due) - now.getTime();
   if (ms < 0) return { text: '已逾期，尽快补交', tone: 'danger' };
   const days = Math.round((startOfDay(Date.parse(it.due)) - startOfDay(now)) / (24 * HOUR));
+  if (it.type === 'presentation') {
+    if (days <= 0) return { text: `今天展示 · ${formatDue(it.due, now).replace('今天 ', '')}`, tone: 'danger' };
+    if (days === 1) return { text: '明天展示，最后准备', tone: 'warn' };
+    return { text: `${days} 天后展示，开始准备`, tone: 'accent' };
+  }
   if (it.type === 'exam') {
     if (days <= 0) return { text: `今天考试 · ${formatDue(it.due, now).replace('今天 ', '')}`, tone: 'danger' };
     if (days === 1) return { text: '明天考试，最后复习', tone: 'warn' };
@@ -45,7 +50,7 @@ export function buildPlan(items, now = new Date(), overrides = {}) {
       if (ms < -7 * 24 * HOUR) continue;             // 过期太久的不再催
       score = -1e6 + ms / HOUR;
     } else {
-      const window = it.type === 'exam' ? EXAM_WINDOW_H : PLAN_WINDOW_H;
+      const window = it.type === 'exam' || it.type === 'presentation' ? EXAM_WINDOW_H : PLAN_WINDOW_H;
       if (ms > window * HOUR) continue;
       score = ms / HOUR / (WEIGHT[it.type] || 1);
     }

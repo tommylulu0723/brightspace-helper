@@ -7,6 +7,18 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.5.0',
+    d: '2026-10-22',
+    items: [
+      '自己添加截止事项：截止时间页右上角"添加截止"，可以加 presentation、小组讨论、自己定的 deadline；会进今日计划、提醒、手机网页和提醒邮件；点标题可以编辑 / 删除',
+      '主页右上角可以直接切换 中 / EN'
+    ],
+    en: [
+      'Add your own deadlines: "Add deadline" on the Deadlines page — presentations, group meetings, personal deadlines. They appear in today\'s plan, alerts, the mobile web app and reminder emails; click the title to edit or delete',
+      'Switch 中 / EN right from the top bar'
+    ]
+  },
+  {
     v: '1.4.1',
     d: '2026-10-22',
     items: [

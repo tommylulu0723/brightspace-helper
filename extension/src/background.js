@@ -8,6 +8,7 @@ import { buildPlan } from './lib/plan.js';
 import { unreadCount } from './lib/feed.js';
 import { VERSION_NOTES, REQUIRE_LOGIN } from './config.js';
 import { gateState, isBlocking } from './lib/gate.js';
+import { withCustom } from './lib/custom.js';
 import { tr } from './lib/i18n.js';
 import { loadLang } from './lang.js';
 import { parseFirstNotes } from './lib/selfupdate.js';
@@ -147,7 +148,9 @@ async function setStatus(patch) {
 }
 
 async function refreshBadge() {
-  const { data, overrides = {}, status = {}, updates = [], seenAt = 0, settings = {}, pendingUpdate } = await chrome.storage.local.get(['data', 'overrides', 'status', 'updates', 'seenAt', 'settings', 'pendingUpdate']);
+  const got = await chrome.storage.local.get(['data', 'overrides', 'status', 'updates', 'seenAt', 'settings', 'pendingUpdate']);
+  const { overrides = {}, status = {}, updates = [], seenAt = 0, settings = {}, pendingUpdate } = got;
+  const data = withCustom(got.data, settings); // 自己添加的截止事项也算进图标数字
   if (REQUIRE_LOGIN) {
     const { cloud: c } = await chrome.storage.local.get('cloud');
     const g = gateState({ requireLogin: true, cloud: c, data });
@@ -358,7 +361,7 @@ async function cloudSync({ pushSnapshot = true } = {}) {
         settings: publicSettings(merged.settings), settingsAt: merged.settingsAt
       };
       if (pushSnapshot && st.data) {
-        body.snapshot = compactSnapshot(st.data);
+        body.snapshot = compactSnapshot(withCustom(st.data, merged.settings)); // 自己添加的也上传：手机网页和提醒邮件都能看到
         body.snapshotAt = Date.parse(st.data.lastSync) || Date.now();
       }
       await cloud.putState(c.server, c.token, body);
@@ -384,7 +387,7 @@ async function cloudSync({ pushSnapshot = true } = {}) {
 
 function scheduleCloudPush() {
   clearTimeout(cloudTimer);
-  cloudTimer = setTimeout(() => cloudSync({ pushSnapshot: false }), 3000);
+  cloudTimer = setTimeout(() => cloudSync({ pushSnapshot: true }), 3000);
 }
 
 let running = null;
@@ -403,8 +406,9 @@ function syncNow(reason, { forceMaterials = false } = {}) {
       await chrome.storage.local.remove('loginNotifiedAt');
       await recordUpdates(prev, result);
       await refreshBadge();
-      await notifyDueSoon(result);
-      await notifyDailyPlan(result);
+      const { settings: cur = {} } = await chrome.storage.local.get('settings');
+      await notifyDueSoon(withCustom(result, cur));
+      await notifyDailyPlan(withCustom(result, cur));
       cloudSync().catch(() => {});
       return { ok: true };
     } catch (e) {

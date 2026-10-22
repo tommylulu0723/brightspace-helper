@@ -37,6 +37,9 @@
       <span class="sr">搜索</span>
       <input id="q" type="search" placeholder="搜索…" autocomplete="off">
     </label>
+    <div id="langMini" class="lang-mini" role="group" aria-label="Language" data-no-tr>
+      <button type="button" data-lang="zh">中</button><button type="button" data-lang="en">EN</button>
+    </div>
     <div class="sync">
       <span id="syncText" class="sync-text" aria-live="polite"></span>
       <button id="syncBtn" class="btn" type="button" title="从 Brightspace 同步">
@@ -68,10 +71,16 @@
             <h1>截止时间</h1>
             <p id="subtitle" class="subtitle"></p>
           </div>
+          <div class="head-actions">
+          <button id="addBtn" class="btn primary" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            添加截止
+          </button>
           <button id="icsBtn" class="btn" type="button">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
             导出到日历
           </button>
+          </div>
         </div>
         <div id="planBox"></div>
         <div class="stats">

@@ -4,6 +4,7 @@ import { createStore } from '../store.js';
 import { buildPlan } from '../lib/plan.js';
 import { unreadCount } from '../lib/feed.js';
 import { gateState, isBlocking } from '../lib/gate.js';
+import { withCustom } from '../lib/custom.js';
 import { REQUIRE_LOGIN } from '../config.js';
 import { loadLang } from '../lang.js';
 import { translatePage, getLang, setLang } from '../lib/i18n.js';
@@ -28,7 +29,9 @@ function h(tag, attrs = {}, ...children) {
 }
 
 async function render() {
-  const { data, status = {}, overrides = {}, settings = {}, updates = [], seenAt = 0, pendingUpdate, cloud } = await store.get(['data', 'status', 'overrides', 'settings', 'updates', 'seenAt', 'pendingUpdate', 'cloud']);
+  const got = await store.get(['data', 'status', 'overrides', 'settings', 'updates', 'seenAt', 'pendingUpdate', 'cloud']);
+  const { status = {}, overrides = {}, settings = {}, updates = [], seenAt = 0, pendingUpdate, cloud } = got;
+  const data = withCustom(got.data, settings);
   const now = new Date();
   const gate = store.demo ? { state: 'ok' } : gateState({ requireLogin: REQUIRE_LOGIN, cloud, data });
   document.body.classList.toggle('locked', gate.state !== 'ok');
