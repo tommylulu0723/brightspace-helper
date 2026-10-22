@@ -41,3 +41,13 @@ body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 .empty { text-align: center; color: var(--muted); padding: 32px 16px; background: var(--surface); border: 1px dashed var(--border); border-radius: 14px; }
 .foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 8px; }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20; padding: 11px 16px; border-radius: 12px; background: var(--ink); color: var(--bg); font-size: 13.5px; box-shadow: var(--shadow-md); max-width: calc(100% - 32px); }
+
+.locked-box { margin: 12px 0; padding: 16px; border-radius: 14px; background: var(--danger-soft); color: var(--danger); display: flex; flex-direction: column; gap: 6px; }
+.locked-box p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+.mplan { margin-top: 4px; }
+.prow { display: flex; gap: 12px; padding: 12px 14px; align-items: flex-start; border-bottom: 1px solid var(--border); }
+.prow:last-child { border-bottom: 0; }
+.pnum { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; color: #fff; background: var(--cc, var(--accent)); }
+.mremind { margin: 18px 0 0; padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); font-size: 13.5px; display: flex; flex-direction: column; gap: 10px; }
+.mremind span { color: var(--muted); }
+.mremind .mcourses { padding: 0; margin: 0; }

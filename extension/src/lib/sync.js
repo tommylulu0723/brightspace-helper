@@ -323,7 +323,11 @@ export async function runSync({ client, now = new Date(), prev = {}, settings = 
   const items = mergeItems(ctx.raw.filter((r) => known.has(String(r.courseId))));
 
   return {
-    user: me ? { name: [me.FirstName, me.LastName].filter(Boolean).join(' ') || me.UniqueName || '' } : null,
+    user: me ? {
+      name: [me.FirstName, me.LastName].filter(Boolean).join(' ') || me.UniqueName || '',
+      firstName: me.FirstName || '', lastName: me.LastName || '',
+      id: me.Identifier != null ? String(me.Identifier) : '', uniqueName: me.UniqueName || ''
+    } : null,
     // courses = 正在同步的课；allCourses = 所有选过的课（课程管理里用）
     courses: active.map((c) => ({
       id: c.id, name: c.name, code: c.code, hidden: false, auto: auto.has(c.id),

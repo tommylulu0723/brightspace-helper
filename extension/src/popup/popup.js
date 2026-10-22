@@ -3,6 +3,8 @@ import { BASE_URL } from '../lib/api.js';
 import { createStore } from '../store.js';
 import { buildPlan } from '../lib/plan.js';
 import { unreadCount } from '../lib/feed.js';
+import { gateState } from '../lib/gate.js';
+import { REQUIRE_LOGIN } from '../config.js';
 
 const store = createStore();
 const $ = (id) => document.getElementById(id);
@@ -24,8 +26,23 @@ function h(tag, attrs = {}, ...children) {
 }
 
 async function render() {
-  const { data, status = {}, overrides = {}, settings = {}, updates = [], seenAt = 0, pendingUpdate } = await store.get(['data', 'status', 'overrides', 'settings', 'updates', 'seenAt', 'pendingUpdate']);
+  const { data, status = {}, overrides = {}, settings = {}, updates = [], seenAt = 0, pendingUpdate, cloud } = await store.get(['data', 'status', 'overrides', 'settings', 'updates', 'seenAt', 'pendingUpdate', 'cloud']);
   const now = new Date();
+  const gate = store.demo ? { state: 'ok' } : gateState({ requireLogin: REQUIRE_LOGIN, cloud, data });
+  document.body.classList.toggle('locked', gate.state !== 'ok');
+  if (gate.state !== 'ok') {
+    const msg = {
+      login: ['请先登录课程助手', '只有注册并通过 Brightspace 姓名校验的同学才能使用。'],
+      needBrightspace: ['还差一步：登录 Brightspace', '课程助手要核对一下 Brightspace 上的姓名。'],
+      checking: ['正在核对姓名…', '稍等几秒。'],
+      mismatch: ['姓名和 Brightspace 不一致', gate.reason || '请联系管理员。'],
+      taken: ['这个 Brightspace 账号已经被绑定', '请用之前注册的账号登录，或联系管理员。']
+    }[gate.state];
+    const btn = h('button', { class: 'btn primary', type: 'button' }, gate.state === 'login' ? '登录 / 注册' : '查看详情');
+    btn.addEventListener('click', async () => { await store.openDashboard(''); window.close(); });
+    $('gateBox').replaceChildren(h('strong', {}, msg[0]), h('p', {}, msg[1]), btn);
+    return;
+  }
   const syncing = status.state === 'syncing';
 
   $('syncBtn').disabled = syncing;

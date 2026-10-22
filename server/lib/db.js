@@ -10,10 +10,14 @@ const DEFAULT_DB = () => ({
   sessions: [],
   invites: [],
   settings: {
-    registration: 'invite',           // open = 随便注册 / invite = 要邀请码 / closed = 关闭注册
+    registration: 'open',             // open = 随便注册（注册后要通过 Brightspace 姓名校验才能用）/ invite = 要邀请码 / closed = 关闭注册
     flags: { sync: true },
-    announcement: ''
+    announcement: '',
+    siteUrl: '',                      // 邮件里的链接用，例如 https://study.example.com；留空用访问时的域名
+    mail: {}                          // 发信邮箱：{ host, port, secure, user, pass, from, fromName }
   },
+  mailStats: {},                      // 'YYYY-MM-DD' -> { sent, failed }，保留 30 天
+  mailLog: [],                        // 最近 200 封邮件的发送记录
   activity: {},                       // 'YYYY-MM-DD' -> { syncs, users: [userId] }，保留 60 天
   audit: []
 });

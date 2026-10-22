@@ -44,3 +44,9 @@ body { width: 380px; min-height: 200px; }
 .updates-btn:hover { filter: brightness(.97); }
 .list-title { padding: 12px 14px 0; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .03em; }
 .plist .chip { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+
+.gate-box { display: none; }
+body.locked .gate-box { display: flex; flex-direction: column; gap: 8px; margin: 14px; padding: 16px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-text); font-size: 13.5px; }
+body.locked .gate-box p { margin: 0; color: var(--ink-2); line-height: 1.5; }
+body.locked .gate-box .btn { align-self: flex-start; }
+body.locked #banner, body.locked #summary, body.locked #updatesBtn, body.locked #listTitle, body.locked #list, body.locked .pf, body.locked #syncBtn { display: none !important; }

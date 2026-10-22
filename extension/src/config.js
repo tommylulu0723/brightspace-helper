@@ -2,7 +2,20 @@
 // 同学装好插件后登录页就会自动填好，不用每个人手动输入。
 export const DEFAULT_SERVER = '';
 
+// 设置了服务器地址时，必须注册 / 登录、并且姓名和 Brightspace 一致才能用
+export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
+
 export const VERSION_NOTES = [
+  {
+    v: '1.3.0',
+    d: '2026-10-22',
+    items: [
+      '账号系统（服务器上线后生效）：注册要填 First name / Last name，必须和 Brightspace 上的姓名一致才能使用；每个 Brightspace 账号只能绑定一个课程助手账号',
+      '截止提醒邮件：截止前 24 小时和 3 小时，把还没交的作业 / 测验发到注册邮箱，电脑关机也照样发；设置 → 账号里可以开关、发测试邮件',
+      '手机 / iPad 网页版：今日计划、截止时间、勾选完成、邮件提醒开关，可以"添加到主屏幕"像 App 一样用',
+      'Windows 图形安装程序：可以选择安装位置，有进度条和完成页；Mac 安装也可以选位置'
+    ]
+  },
   {
     v: '1.2.1',
     d: '2026-10-22',

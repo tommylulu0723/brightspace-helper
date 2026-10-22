@@ -19,7 +19,8 @@
 
 param(
   [string]$Repo = 'tommylulu0723/brightspace-helper',
-  [string]$Dir = ''
+  [string]$Dir = '',
+  [switch]$NoChrome   # 图形安装向导调用时用：最后一步由向导自己显示
 )
 
 $ErrorActionPreference = 'Stop'
@@ -125,6 +126,7 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 }
 
 $ExtDir = Join-Path $Dir 'extension'
+if ($NoChrome) { Ok "安装完成：$ExtDir"; return }
 try { Set-Clipboard -Value $ExtDir } catch { }
 
 # 找 Chrome，直接打开扩展程序页面

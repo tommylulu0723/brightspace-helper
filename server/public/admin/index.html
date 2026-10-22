@@ -27,6 +27,7 @@
       <nav class="tabs" role="tablist" aria-label="页面">
         <button class="tab" role="tab" type="button" data-tab="overview">概览</button>
         <button class="tab" role="tab" type="button" data-tab="users">用户</button>
+        <button class="tab" role="tab" type="button" data-tab="mail">邮件提醒</button>
         <button class="tab" role="tab" type="button" data-tab="invites">邀请码</button>
         <button class="tab" role="tab" type="button" data-tab="settings">设置</button>
         <button class="tab" role="tab" type="button" data-tab="audit">操作记录</button>
@@ -52,7 +53,35 @@
       <div class="page-head"><div><h1>用户</h1><p class="subtitle" id="usersSub"></p></div>
         <label class="search small-search"><span class="sr">搜索用户</span><input id="userQ" type="search" placeholder="搜索名字或邮箱…"></label></div>
       <div class="card table-card"><div class="table-wrap"><table class="table" id="usersTable"></table></div></div>
-      <p class="hint">管理员只能看到每个人的统计数字（课程数、事项数、课件数），看不到具体的课程内容。</p>
+      <p class="hint">"Brightspace 校验"：插件登录 Brightspace 后会把那边的姓名发过来比对，一致才能用。拼法不同但确认是本人，可以点"手动通过"。管理员只能看到每个人的统计数字，看不到具体的课程内容。</p>
+    </section>
+
+    <section data-panel="mail" hidden>
+      <div class="page-head"><div><h1>邮件提醒</h1><p class="subtitle" id="mailSub">截止前 24 小时、3 小时给还没交的同学发邮件，每 5 分钟检查一次。</p></div>
+        <button id="runReminders" class="btn" type="button">立即检查一次</button></div>
+      <div class="stats" id="mailStats"></div>
+      <form id="mailForm" class="card settings-form">
+        <fieldset>
+          <legend>发信邮箱</legend>
+          <p class="hint">推荐用一个专门的 Gmail：Google 账号 → 安全性 → 两步验证打开 → 搜索"应用专用密码"→ 生成 16 位密码填到下面。QQ 邮箱：设置 → 账户 → 开启 SMTP → 生成授权码。</p>
+          <div class="grid2">
+            <label class="field"><span>SMTP 服务器</span><input name="host" placeholder="smtp.gmail.com" autocomplete="off"></label>
+            <label class="field"><span>端口</span><input name="port" type="number" placeholder="465"></label>
+            <label class="field"><span>邮箱账号</span><input name="user" placeholder="yourbot@gmail.com" autocomplete="off"></label>
+            <label class="field"><span>应用专用密码 / 授权码</span><input name="pass" type="password" placeholder="不改就留空" autocomplete="new-password"></label>
+            <label class="field"><span>发件人名字</span><input name="fromName" placeholder="课程助手"></label>
+            <label class="field"><span>加密方式</span><select name="secure"><option value="ssl">SSL（端口 465）</option><option value="starttls">STARTTLS（端口 587）</option></select></label>
+          </div>
+          <label class="field"><span>网站地址（邮件里"在手机上查看"的链接）</span><input name="siteUrl" placeholder="https://study.你的域名"></label>
+        </fieldset>
+        <div class="form-actions">
+          <button class="btn primary" type="submit">保存</button>
+          <input name="testTo" type="email" placeholder="测试收件邮箱（默认发给你自己）" class="test-to">
+          <button id="mailTest" class="btn" type="button">发一封测试邮件</button>
+          <span id="mailSaved" class="hint" aria-live="polite"></span>
+        </div>
+      </form>
+      <div class="card table-card"><div class="card-head"><h2>最近发送记录</h2></div><div class="table-wrap"><table class="table" id="mailTable"></table></div></div>
     </section>
 
     <section data-panel="invites" hidden>
@@ -70,8 +99,8 @@
       <form id="settingsForm" class="card settings-form">
         <fieldset>
           <legend>注册方式</legend>
-          <label class="radio"><input type="radio" name="registration" value="invite"><span><b>需要邀请码</b>（推荐）只有拿到邀请码的同学能注册</span></label>
-          <label class="radio"><input type="radio" name="registration" value="open"><span><b>开放注册</b> 知道服务器地址的人都能注册</span></label>
+          <label class="radio"><input type="radio" name="registration" value="open"><span><b>开放注册</b>（推荐）谁都能注册，但必须通过 Brightspace 姓名校验才能用</span></label>
+          <label class="radio"><input type="radio" name="registration" value="invite"><span><b>需要邀请码</b> 只有拿到邀请码的同学能注册</span></label>
           <label class="radio"><input type="radio" name="registration" value="closed"><span><b>关闭注册</b> 不再接受新用户</span></label>
         </fieldset>
         <fieldset>

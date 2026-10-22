@@ -10,7 +10,7 @@ const t = (name, fn) => { fn(); n++; };
 t('读出最新一条更新说明，且和 manifest 版本一致', () => {
   const r = parseFirstNotes(cfg);
   assert.equal(r.v, manifest.version);
-  assert.ok(r.items.length >= 1 && r.items[0].includes('热更新'));
+  assert.ok(r.items.length >= 1 && r.items.every((x) => x.length > 5));
 });
 t('支持转义的单引号', () => {
   const r = parseFirstNotes("export const VERSION_NOTES = [\n  { v: '9.9.9', d: 'x', items: ['it\\'s ok', 'b'] },\n  { v: '1', d: 'y', items: ['z'] }\n];");

@@ -1,4 +1,4 @@
-# 课程助手 1.2（插件 + 可选后端）
+# 课程助手 1.3（插件 + 可选后端）
 
 ```
 extension/   Chrome 插件：截止时间汇总、课件库、课程管理、账号登录（可选）
@@ -15,7 +15,9 @@ deploy/      服务器自动更新脚本、Caddy 配置片段
 - **截止时间汇总**：所有课的作业、测验、考试、讨论按"已逾期 / 今天 / 明天 / 7 天内 / 之后"排好，能看出交没交；后台每 30 分钟自动同步，图标上显示紧急事项数，到期前 24 小时提醒。可以导出到 Google / Apple 日历。
 - **课件库**：每门课的课件按章节列出，单个、整章、整门课一键下载，自动整理到 `下载/Brightspace/课程/章节/`。
 - **课程管理**：移除不重要的课，或把没被自动识别的课加回来。
-- **账号与云同步（可选）**：只在本机用不需要。部署了下面的后端后，可以云同步、在手机上看截止时间，管理员后台可以给同学发邀请码。
+- **账号（服务器上线后必须登录）**：注册填 First name / Last name / 邮箱。插件读到 Brightspace 上的姓名后交给服务器核对，一致才放行，并把这个 Brightspace 账号绑定到这个课程助手账号（一个 Brightspace 账号只能绑一个）。拼法不同但确认是本人，管理员可以在后台改姓名或"手动通过"。`extension/src/config.js` 的 `DEFAULT_SERVER` 留空时不要求登录。
+- **截止提醒邮件**：服务器每 5 分钟检查一次，截止前 24 小时、3 小时把还没交的事项发到注册邮箱（已交 / 勾了完成 / 移除的课不发）。发信邮箱在管理后台"邮件提醒"里设置（推荐 Gmail 应用专用密码）。
+- **手机 / iPad**：`https://服务器/m/`，今日计划、截止时间、勾选完成、提醒开关，可以添加到主屏幕。手机和 iPad 的浏览器装不了插件，数据来自电脑上插件的同步。
 
 ## 用 GitHub 更新插件
 
@@ -36,6 +38,14 @@ deploy/      服务器自动更新脚本、Caddy 配置片段
 建一个新的**私有**仓库（例如 `brightspace-helper`），把这个文件夹推上去。服务器拉取方式和情侣空间一样（用同样的 deploy key / token）。
 
 ### 3. 在服务器上首次安装（只需要一次）
+
+一条命令（会自动构建、启动、加 cron、把域名加进 Caddy）：
+
+```bash
+curl -fsSL -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/tommylulu0723/brightspace-helper/contents/deploy/server-setup.sh?ref=main" | DOMAIN=study.你的域名 sh
+```
+
+手动安装的话：
 
 ```bash
 git clone <你的仓库地址> /root/course-helper-src
@@ -99,6 +109,9 @@ export const DEFAULT_SERVER = 'https://study.你的域名';
 node extension/test/run-tests.mjs    # 同步逻辑（27 项）
 node extension/test/v11.test.mjs     # 今日计划 / 动态 / 成绩（14 项）
 node extension/test/cloud.test.mjs   # 云同步（4 项）
-node server/test/api.test.mjs        # 后端接口（16 项）
+node extension/test/gate.test.mjs    # 登录门禁（5 项）
+node extension/test/selfupdate.test.mjs  # 热更新（3 项）
+node server/test/api.test.mjs        # 后端接口、姓名校验、提醒邮件（21 项）
+node server/test/mail.test.mjs       # SMTP 发信、姓名匹配、提醒挑选（7 项）
 PORT=3100 node server/server.js      # 本地跑后端
 ```

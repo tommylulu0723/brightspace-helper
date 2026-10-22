@@ -6,7 +6,8 @@ import { cloud, CloudError, compactSnapshot, mergeState, publicSettings } from '
 import { diffSync, mergeUpdates, describeUpdate } from './lib/changes.js';
 import { buildPlan } from './lib/plan.js';
 import { unreadCount } from './lib/feed.js';
-import { VERSION_NOTES } from './config.js';
+import { VERSION_NOTES, REQUIRE_LOGIN } from './config.js';
+import { gateState } from './lib/gate.js';
 import { parseFirstNotes } from './lib/selfupdate.js';
 
 const ALARM = 'sync';
@@ -127,6 +128,16 @@ async function setStatus(patch) {
 
 async function refreshBadge() {
   const { data, overrides = {}, status = {}, updates = [], seenAt = 0, settings = {}, pendingUpdate } = await chrome.storage.local.get(['data', 'overrides', 'status', 'updates', 'seenAt', 'settings', 'pendingUpdate']);
+  if (REQUIRE_LOGIN) {
+    const { cloud: c } = await chrome.storage.local.get('cloud');
+    const g = gateState({ requireLogin: true, cloud: c, data });
+    if (g.state !== 'ok') {
+      await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
+      await chrome.action.setBadgeText({ text: '!' });
+      await chrome.action.setTitle({ title: g.state === 'login' ? '课程助手：请先登录' : '课程助手：需要完成 Brightspace 姓名校验' });
+      return;
+    }
+  }
   if (status.state === 'error' && status.error?.code === 'AUTH_REQUIRED') {
     await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
     await chrome.action.setBadgeText({ text: '!' });
@@ -156,6 +167,30 @@ async function refreshBadge() {
   await chrome.action.setTitle({ title: parts.length ? `课程助手：${parts.join('，')}` : '课程助手' });
 }
 
+// 需要登录但还没登录 / 没通过姓名校验时：照常同步（要读 Brightspace 上的姓名），但不发通知
+async function locked() {
+  if (!REQUIRE_LOGIN) return false;
+  const { cloud: c, data } = await chrome.storage.local.get(['cloud', 'data']);
+  return gateState({ requireLogin: true, cloud: c, data }).state !== 'ok';
+}
+
+// 把 Brightspace 上的姓名发给服务器核对（登录后、每次同步后都做一次）
+async function verifyIdentity() {
+  const { cloud: c, data } = await chrome.storage.local.get(['cloud', 'data']);
+  if (!c?.token || !data?.user || !(data.user.firstName || data.user.lastName)) return null;
+  try {
+    const r = await cloud.verify(c.server, c.token, { firstName: data.user.firstName, lastName: data.user.lastName, identifier: data.user.id, uniqueName: data.user.uniqueName });
+    const { cloud: now } = await chrome.storage.local.get('cloud');
+    if (now?.token === c.token) await chrome.storage.local.set({ cloud: { ...now, user: r.user, error: null } });
+    return r.user.verify;
+  } catch (e) {
+    if (e instanceof CloudError && e.status === 401) {
+      await chrome.storage.local.set({ cloud: { ...c, token: null, user: null, error: e.code === 'DISABLED' ? '账号已被管理员停用' : '登录已过期，请重新登录' } });
+    }
+    return null; // 连不上服务器时沿用上次的结果，不把人锁在外面
+  }
+}
+
 // 课件、公告、成绩、截止时间有变化时发一条汇总通知
 async function recordUpdates(prev, result) {
   const now = new Date();
@@ -163,7 +198,7 @@ async function recordUpdates(prev, result) {
   const { updates = [], settings = {} } = await chrome.storage.local.get(['updates', 'settings']);
   if (!events.length) return;
   await chrome.storage.local.set({ updates: mergeUpdates(updates, events, now) });
-  if (settings.notifyUpdates === false) return;
+  if (settings.notifyUpdates === false || (await locked())) return;
   const hidden = new Set(settings.hiddenCourseIds || []);
   const names = Object.fromEntries((result.courses || []).map((c) => [c.id, c.name]));
   const show = events.filter((e) => !hidden.has(e.courseId));
@@ -184,7 +219,7 @@ async function notifyDailyPlan(data) {
   if (now.getHours() < 8) return;
   const today = now.toLocaleDateString('en-CA');
   const { settings = {}, overrides = {}, planNotifiedOn } = await chrome.storage.local.get(['settings', 'overrides', 'planNotifiedOn']);
-  if (settings.notifyPlan === false || planNotifiedOn === today) return;
+  if (settings.notifyPlan === false || planNotifiedOn === today || (await locked())) return;
   const hidden = new Set(settings.hiddenCourseIds || []);
   const plan = buildPlan((data.items || []).filter((it) => !hidden.has(it.courseId)), now, overrides);
   await chrome.storage.local.set({ planNotifiedOn: today });
@@ -201,7 +236,7 @@ async function notifyDailyPlan(data) {
 
 async function notifyDueSoon(data) {
   const { settings = {}, overrides = {}, notified = {} } = await chrome.storage.local.get(['settings', 'overrides', 'notified']);
-  if (settings.notify === false) return;
+  if (settings.notify === false || (await locked())) return;
   const now = new Date();
   const t = now.getTime();
   const names = Object.fromEntries((data.courses || []).map((c) => [c.id, c.name]));
@@ -271,7 +306,15 @@ async function cloudSync({ pushSnapshot = true } = {}) {
     const c = st.cloud;
     if (!c || !c.token) return { ok: false, skipped: true };
     try {
+      await verifyIdentity();
       const me = await cloud.me(c.server, c.token);
+      if (me.user?.verify?.status !== 'ok') {
+        // 没通过姓名校验：服务器不收数据，只更新账号状态
+        const { cloud: cur } = await chrome.storage.local.get('cloud');
+        await chrome.storage.local.set({ cloud: { ...(cur || c), user: me.user, flags: me.flags || {}, announcement: me.announcement || '', error: null } });
+        await refreshBadge();
+        return { ok: false, error: '还没通过 Brightspace 姓名校验', code: 'NOT_VERIFIED' };
+      }
       const remote = await cloud.getState(c.server, c.token);
       const merged = mergeState(
         { overrides: st.overrides, overridesAt: st.overridesAt, settings: st.settings, settingsAt: st.settingsAt },
@@ -292,13 +335,17 @@ async function cloudSync({ pushSnapshot = true } = {}) {
         body.snapshotAt = Date.parse(st.data.lastSync) || Date.now();
       }
       await cloud.putState(c.server, c.token, body);
-      await chrome.storage.local.set({ cloud: { ...c, user: me.user, flags: me.flags || {}, announcement: me.announcement || '', lastCloudSync: new Date().toISOString(), error: null } });
+      const { cloud: cur } = await chrome.storage.local.get('cloud');
+      await chrome.storage.local.set({ cloud: { ...(cur || c), user: me.user, flags: me.flags || {}, announcement: me.announcement || '', lastCloudSync: new Date().toISOString(), error: null } });
+      await refreshBadge();
       return { ok: true, pulled: merged.changedLocal };
     } catch (e) {
       const loggedOut = e instanceof CloudError && e.status === 401;
+      const { cloud: cur } = await chrome.storage.local.get('cloud');
+      const base = cur || c;
       const next = loggedOut
-        ? { ...c, token: null, error: e.code === 'DISABLED' ? '账号已被管理员停用' : '登录已过期，请重新登录' }
-        : { ...c, error: e.message };
+        ? { ...base, token: null, error: e.code === 'DISABLED' ? '账号已被管理员停用' : '登录已过期，请重新登录' }
+        : e.code === 'NOT_VERIFIED' ? base : { ...base, error: e.message };
       await chrome.storage.local.set({ cloud: next });
       return { ok: false, error: e.message };
     } finally {
@@ -399,7 +446,7 @@ chrome.notifications.onClicked.addListener((id) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && (changes.overridesAt || changes.settingsAt)) scheduleCloudPush();
   if (area === 'local' && (changes.seenAt || changes.settings)) refreshBadge();
-  if (area === 'local' && (changes.overrides || changes.pendingUpdate)) refreshBadge();
+  if (area === 'local' && (changes.overrides || changes.pendingUpdate || changes.cloud)) refreshBadge();
 });
 
 // 刚登录完 Brightspace 时，如果之前是"登录过期"状态，马上补一次同步

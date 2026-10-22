@@ -2,7 +2,7 @@
 // 每一块只在它自己的数据变了才重画，避免正在输入的内容被清掉。
 import { h, fill, add, icon, I, toast, confirmDialog, initials } from './ui.js';
 import { cloud, normalizeServer } from '../lib/cloud.js';
-import { DEFAULT_SERVER, VERSION_NOTES } from '../config.js';
+import { DEFAULT_SERVER, VERSION_NOTES, REQUIRE_LOGIN } from '../config.js';
 import { courseColorMap } from '../lib/format.js';
 
 const sections = {};
@@ -32,6 +32,40 @@ export function resetSettingsCache() {
 }
 
 // ---------------- 账号 ----------------
+const VSTATUS = { ok: ['已通过 Brightspace 姓名校验', 'ok'], mismatch: ['姓名和 Brightspace 不一致', 'danger'], taken: ['Brightspace 账号已被别人绑定', 'danger'], pending: ['等待 Brightspace 姓名校验', 'neutral'] };
+
+function verifyLine(u) {
+  const v = u.verify || { status: 'pending' };
+  const [label, tone] = VSTATUS[v.status] || VSTATUS.pending;
+  return h('div', { class: 'verify-line' }, h('span', { class: `chip ${tone}` }, label),
+    v.bsName ? h('span', { class: 'muted' }, `Brightspace：${v.bsName}${v.uniqueName ? `（${v.uniqueName}）` : ''}`) : null,
+    v.status !== 'ok' && v.reason ? h('span', { class: 'muted' }, v.reason) : null);
+}
+
+function remindersBox(c, ctx) {
+  const u = c.user;
+  const r = u.reminders || { h24: true, h3: true };
+  const save = async (patch) => {
+    try {
+      const out = await cloud.updateProfile(c.server, c.token, { reminders: { ...r, ...patch } });
+      await ctx.store.set({ cloud: { ...ctx.state.cloud, user: out.user } });
+      toast('已保存');
+    } catch (e) { toast(`没保存上：${e.message}`); }
+  };
+  const box = (key, label) => {
+    const input = h('input', { type: 'checkbox', checked: r[key] !== false });
+    input.addEventListener('change', () => save({ [key]: input.checked }));
+    return h('label', { class: 'check-row' }, input, h('span', {}, h('b', {}, label)));
+  };
+  return h('div', { class: 'reminder-box' },
+    h('div', { class: 'reminder-head' }, h('strong', {}, '邮件提醒'), h('span', { class: 'muted' }, `发到 ${u.email}，没交的作业 / 测验才会提醒；电脑关机也照样发`)),
+    box('h24', '截止前 24 小时'),
+    box('h3', '截止前 3 小时'),
+    h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn small', onClick: async (e) => {
+      e.currentTarget.disabled = true;
+      try { await cloud.testEmail(c.server, c.token); toast(`测试邮件已发到 ${u.email}，没收到就看看垃圾邮件`); } catch (x) { toast(x.message); }
+    } }, '发一封测试邮件')));
+}
 let authMode = 'login';
 let serverInfo = null;
 
@@ -57,6 +91,8 @@ function renderAccount(body, ctx) {
           h('span', { class: 'muted' }, u.email),
           h('span', { class: 'muted' }, `服务器：${base} · ${c.lastCloudSync ? `${new Date(c.lastCloudSync).toLocaleString()} 云同步` : '还没云同步过'}`),
           c.error ? h('span', { class: 'err' }, c.error) : null)),
+      verifyLine(u),
+      remindersBox(c, ctx),
       h('div', { class: 'btn-row' },
         h('button', { type: 'button', class: 'btn', onClick: async (e) => {
           e.currentTarget.disabled = true;
@@ -67,7 +103,7 @@ function renderAccount(body, ctx) {
         u.role === 'admin' ? h('a', { class: 'btn', href: `${base}/admin/`, target: '_blank', rel: 'noopener' }, '打开管理后台') : null,
         h('button', { type: 'button', class: 'btn', onClick: () => passwordDialog(c) }, '修改密码'),
         h('button', { type: 'button', class: 'btn', onClick: async () => {
-          if (!(await confirmDialog({ title: '退出登录？', body: '本机的数据和设置会保留，只是不再云同步。', ok: '退出登录' }))) return;
+          if (!(await confirmDialog({ title: '退出登录？', body: REQUIRE_LOGIN ? '退出后要重新登录才能继续使用课程助手。' : '本机的数据和设置会保留，只是不再云同步。', ok: '退出登录' }))) return;
           await cloud.logout(c.server, c.token);
           await ctx.store.set({ cloud: { server: c.server, token: null, user: null } });
           toast('已退出登录');
@@ -80,6 +116,7 @@ function renderAccount(body, ctx) {
   const form = h('form', { class: 'auth-form', novalidate: true });
   const err = h('p', { class: 'form-error', role: 'alert' }, c?.error || '');
   const serverInput = h('input', { name: 'server', type: 'url', placeholder: 'https://study.example.com', value: server, autocomplete: 'url', required: true });
+  const bs = ctx.state.data?.user;
   const inviteField = h('label', { class: 'field' }, h('span', {}, '邀请码'), h('input', { name: 'invite', placeholder: '找管理员要，例如 ABCD-2345', autocomplete: 'off' }));
   const infoLine = h('p', { class: 'hint' });
 
@@ -103,8 +140,9 @@ function renderAccount(body, ctx) {
     h('button', { type: 'button', 'aria-pressed': String(reg), onClick: () => { authMode = 'register'; lastKey.account = null; ctx.rerender(); } }, '注册'));
 
   add(form, 
-    h('label', { class: 'field' }, h('span', {}, '服务器地址'), serverInput),
-    reg ? h('label', { class: 'field' }, h('span', {}, '名字（同学之间显示）'), h('input', { name: 'name', maxlength: 40, autocomplete: 'nickname' })) : null,
+    DEFAULT_SERVER ? null : h('label', { class: 'field' }, h('span', {}, '服务器地址'), serverInput),
+    reg ? h('label', { class: 'field' }, h('span', {}, 'First name（和 Brightspace 一致）'), h('input', { name: 'firstName', maxlength: 40, autocomplete: 'given-name', value: bs?.firstName || '' })) : null,
+    reg ? h('label', { class: 'field' }, h('span', {}, 'Last name（和 Brightspace 一致）'), h('input', { name: 'lastName', maxlength: 40, autocomplete: 'family-name', value: bs?.lastName || '' })) : null,
     h('label', { class: 'field' }, h('span', {}, '邮箱'), h('input', { name: 'email', type: 'email', autocomplete: 'username', required: true })),
     h('label', { class: 'field' }, h('span', {}, reg ? '密码（至少 8 位）' : '密码'), h('input', { name: 'password', type: 'password', autocomplete: reg ? 'new-password' : 'current-password', required: true })),
     reg ? inviteField : null,
@@ -123,10 +161,10 @@ function renderAccount(body, ctx) {
     btn.disabled = true;
     try {
       const body = { email: f.get('email'), password: f.get('password') };
-      const r = reg ? await cloud.register(url, { ...body, name: f.get('name'), invite: f.get('invite') }) : await cloud.login(url, body);
+      const r = reg ? await cloud.register(url, { ...body, firstName: f.get('firstName'), lastName: f.get('lastName'), invite: f.get('invite') }) : await cloud.login(url, body);
       await ctx.store.set({ cloud: { server: url, token: r.token, user: r.user, flags: r.flags || {}, error: null } });
       toast(reg ? `注册成功，欢迎 ${r.user.name}` : `欢迎回来，${r.user.name}`);
-      ctx.store.cloudSync();
+      ctx.store.sync();
     } catch (x) {
       err.textContent = x.message;
       if (x.code === 'INVITE_REQUIRED') inviteField.hidden = false;
@@ -136,7 +174,7 @@ function renderAccount(body, ctx) {
   });
 
   fill(body, 
-    h('p', { class: 'hint' }, '只在本机用的话不需要登录，所有功能都能正常使用。部署了自己的服务器后，登录可以让"标记完成"和课程设置云同步，手机上也能看截止时间。'),
+    h('p', { class: 'hint' }, REQUIRE_LOGIN ? '登录后"标记完成"和课程设置会云同步，手机上也能看截止时间，还能收到截止提醒邮件。' : '只在本机用的话不需要登录，所有功能都能正常使用。部署了自己的服务器后，登录可以让"标记完成"和课程设置云同步，手机上也能看截止时间。'),
     seg, infoLine, form);
   if (serverInput.value) updateInfo();
 }
@@ -276,8 +314,8 @@ export function renderSettingsView(root, ctx) {
   once('notify', [st.settings?.notify, st.settings?.notifyPlan, st.settings?.notifyUpdates, st.settings?.autoApplyUpdate], () => renderNotify(section(root, 'notify', '通知'), ctx));
   section(root, 'notify', '通知');
   once('account', [st.cloud?.token, st.cloud?.user, st.cloud?.error, st.cloud?.lastCloudSync, authMode], () =>
-    renderAccount(section(root, 'account', '账号与云同步（可选）', null), ctx));
-  section(root, 'account', '账号与云同步（可选）');
+    renderAccount(section(root, 'account', (REQUIRE_LOGIN ? '账号与邮件提醒' : '账号与云同步（可选）'), null), ctx));
+  section(root, 'account', (REQUIRE_LOGIN ? '账号与邮件提醒' : '账号与云同步（可选）'));
   once('diag', [st.data?.lastSync, st.data?.warnings], () => renderDiag(section(root, 'diag', '诊断'), ctx));
   section(root, 'diag', '诊断');
   once('log', [1], () => renderChangelog(section(root, 'log', '更新日志'), ctx));

@@ -1,5 +1,6 @@
 import { TYPE_LABEL, courseColorMap, isDone, formatDue, formatRelative, formatAgo, groupItems, groupOf, stats } from '/lib/format.js';
 import { isDoneStatus } from '/lib/merge.js';
+import { buildPlan } from '/lib/plan.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'ch_token';
@@ -102,6 +103,8 @@ function render() {
     h('div', { class: 'mstat danger' }, h('b', {}, s.overdue), h('span', {}, '确认逾期')));
   $('courses').replaceChildren(...[{ id: 'all', name: '全部' }, ...courses.filter((c) => !hidden.has(c.id))].map((c) =>
     h('button', { type: 'button', 'aria-pressed': String(course === c.id), onClick: () => { course = c.id; render(); } }, c.name)));
+  renderPlan(items, now, ov, colors, names);
+  renderRemind();
   const groups = groupItems(items, now, ov).filter((g) => g.id !== 'donePast' || g.items.length <= 30);
   if (!groups.length) { $('list').replaceChildren(h('div', { class: 'empty' }, '没有待办')); return; }
   $('list').replaceChildren(...groups.map((g) => h('section', {},
@@ -123,21 +126,77 @@ function render() {
     })))));
 }
 
+function renderPlan(items, now, ov, colors, names) {
+  const plan = buildPlan(items, now, ov);
+  const box = $('plan');
+  box.hidden = !plan.length;
+  if (!plan.length) return;
+  box.replaceChildren(
+    h('div', { class: 'ghead' }, h('h2', {}, '今日计划'), h('span', {}, `先做这 ${Math.min(plan.length, 5)} 件`)),
+    h('div', { class: 'gcard' }, ...plan.slice(0, 5).map((it, i) => h('div', { class: 'prow' },
+      h('span', { class: 'pnum', style: `--cc:${colors[it.courseId]}` }, i + 1),
+      h('div', { class: 'mbody' },
+        it.url ? h('a', { class: 'mtitle', href: it.url, target: '_blank', rel: 'noopener' }, it.title) : h('span', { class: 'mtitle' }, it.title),
+        h('div', { class: 'mmeta' }, h('span', { class: 'course-tag', style: `--cc:${colors[it.courseId]}` }, names[it.courseId]), h('span', { class: `chip ${it.reason.tone}` }, it.reason.text)))))));
+}
+
+function renderRemind() {
+  $('remind').hidden = false;
+  const r = state.me.reminders || { h24: true, h3: true };
+  const set = async (patch) => {
+    try {
+      const out = await api('PATCH', '/api/me', { reminders: { ...r, ...patch } });
+      state.me = out.user;
+      renderRemind();
+      toast('已保存');
+    } catch (e) { toast(e.message); }
+  };
+  const chip = (key, label) => h('button', { type: 'button', 'aria-pressed': String(r[key] !== false), onClick: () => set({ [key]: r[key] === false }) }, label);
+  $('remind').replaceChildren(
+    h('div', {}, h('b', {}, '邮件提醒'), h('span', {}, ` · 发到 ${state.me.email}`)),
+    h('div', { class: 'mcourses' }, chip('h24', '截止前 24 小时'), chip('h3', '截止前 3 小时')));
+}
+
+function showLocked(msg) {
+  $('auth').hidden = true;
+  $('app').hidden = false;
+  for (const id of ['stats', 'courses', 'list', 'remind']) $(id).replaceChildren();
+  $('remind').hidden = true;
+  $('plan').hidden = true;
+  $('hello').textContent = state?.me?.name || '课程助手';
+  $('synced').textContent = '';
+  const l = $('locked');
+  l.hidden = false;
+  l.replaceChildren(h('strong', {}, '还不能使用'), h('p', {}, msg), h('p', { class: 'muted' }, '在电脑的 Chrome 里打开课程助手插件，登录 Brightspace 后会自动核对姓名。核对通过后刷新这个页面。'));
+}
+
 async function start() {
   if (!token) { logout(); return; }
+  let me;
   try {
-    const [me, st] = await Promise.all([api('GET', '/api/me'), api('GET', '/api/state')]);
-    state = { ...st, me: me.user };
-    const ann = me.announcement;
-    $('announce').hidden = !ann;
-    $('announce').textContent = ann || '';
+    me = await api('GET', '/api/me');
   } catch {
     return;
   }
+  state = { ...(state || {}), me: me.user };
+  const ann = me.announcement;
+  $('announce').hidden = !ann;
+  $('announce').textContent = ann || '';
+  try {
+    const st = await api('GET', '/api/state');
+    state = { ...st, me: me.user };
+  } catch (e) {
+    showLocked(e.message);
+    return;
+  }
+  $('locked').hidden = true;
   $('auth').hidden = true;
   $('app').hidden = false;
   render();
 }
+
+// 已经"添加到主屏幕"打开的，不再显示安装提示
+if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) $('installTip').hidden = true;
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden && token) start(); });
 setInterval(() => { if (state) render(); }, 60000);

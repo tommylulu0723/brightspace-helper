@@ -1,11 +1,14 @@
 #!/bin/bash
 # 课程助手 · Mac 卸载（双击运行；提示"无法打开"时：右键 → 打开 → 打开）
 LABEL="com.coursehelper.autoupdate"
+LOC="$HOME/Library/Application Support/CourseHelper/location"
 DIR="$HOME/CourseHelper"
+[ -f "$LOC" ] && DIR="$(cat "$LOC")"
 echo "课程助手 · 卸载"
 echo "----------------------------------------"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/$LABEL.plist" "$HOME/Library/Logs/course-helper-update.log"
+rm -rf "$HOME/Library/Application Support/CourseHelper"
 echo "✓ 已关闭自动更新"
 if [ -d "$DIR" ]; then
   read -r -p "删除插件文件夹 $DIR 吗？输入 y 回车删除，直接回车保留：" ANS < /dev/tty

@@ -422,3 +422,33 @@ button.grade-card:hover { border-color: var(--accent); }
   .tabs { overflow-x: auto; flex-wrap: nowrap; max-width: 100%; }
   .tab { flex: none; }
 }
+
+/* ---------------- 登录 / 校验门禁 ---------------- */
+body.locked .wrap, body.locked .tabs, body.locked .search, body.locked .sync { display: none !important; }
+.gate { display: flex; justify-content: center; padding: 48px 16px 64px; }
+.gate-card { width: 100%; max-width: 440px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-sm); padding: 28px 28px 22px; display: flex; flex-direction: column; gap: 14px; }
+.gate-brand { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.gate-brand .logo { width: 30px; height: 30px; border-radius: 9px; background: var(--accent); color: #fff; display: grid; place-items: center; }
+.gate-card h1 { margin: 6px 0 0; font-size: 22px; letter-spacing: -.01em; }
+.gate-sub { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.gate-card .seg { align-self: flex-start; }
+.gate-card .auth-form { display: flex; flex-direction: column; gap: 12px; }
+.gate-card .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gate-card .hint.tight { margin: -6px 0 0; font-size: 12.5px; line-height: 1.5; }
+.btn.big { min-height: 42px; font-size: 15px; justify-content: center; }
+.gate-icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+.gate-icon.wait { background: var(--accent-soft); color: var(--accent-text); }
+.gate-icon.danger { background: var(--danger-soft); color: var(--danger); }
+.gate-icon.ok { background: var(--ok-soft); color: var(--ok); }
+.gate-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.gate-foot { margin: 6px 0 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+.name-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.name-compare > div { background: var(--sunken); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.name-compare span { font-size: 12px; color: var(--muted); }
+.name-compare b { font-size: 15px; word-break: break-word; }
+@media (max-width: 480px) { .gate-card { padding: 22px 18px; } .gate-card .name-row, .name-compare { grid-template-columns: 1fr; } }
+
+.verify-line { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; margin: 4px 0 2px; }
+.reminder-box { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.reminder-head { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.reminder-head .muted { font-size: 12.5px; }

@@ -57,6 +57,8 @@ export const cloud = {
   me: (server, token) => call(server, '/api/me', { token }),
   changePassword: (server, token, body) => call(server, '/api/me/password', { method: 'POST', token, body }),
   updateProfile: (server, token, body) => call(server, '/api/me', { method: 'PATCH', token, body }),
+  verify: (server, token, body) => call(server, '/api/me/verify', { method: 'POST', token, body }),
+  testEmail: (server, token) => call(server, '/api/me/test-email', { method: 'POST', token }),
   getState: (server, token) => call(server, '/api/state', { token }),
   putState: (server, token, body) => call(server, '/api/state', { method: 'PUT', token, body }),
   usage: (server, token, body) => call(server, '/api/usage', { method: 'POST', token, body }).catch(() => null)

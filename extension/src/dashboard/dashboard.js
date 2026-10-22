@@ -13,6 +13,9 @@ import { buildPlan } from '../lib/plan.js';
 import { buildFeed, FEED_FILTERS } from '../lib/feed.js';
 import { UPDATE_KINDS } from '../lib/changes.js';
 import { averagePct, gradeTone } from '../lib/extras.js';
+import { gateState } from '../lib/gate.js';
+import { renderGate, resetGate } from './gate.js';
+import { REQUIRE_LOGIN } from '../config.js';
 
 const store = createStore();
 const $ = (id) => document.getElementById(id);
@@ -67,6 +70,16 @@ const appCtx = () => ({
 
 function render() {
   const now = new Date();
+  // 要求登录时：没登录 / 没通过 Brightspace 姓名校验，只显示登录页
+  const gate = store.demo ? { state: 'ok' } : gateState({ requireLogin: REQUIRE_LOGIN, cloud: state.cloud, data: state.data });
+  const locked = gate.state !== 'ok';
+  document.body.classList.toggle('locked', locked);
+  $('gate').hidden = !locked;
+  if (locked) {
+    renderGate($('gate'), { state, store, rerender: render }, gate);
+    return;
+  }
+  resetGate();
   if (!VIEWS.includes(ui.view)) ui.view = 'deadlines';
   const ctx = ctxFor(now);
   const ids = new Set(ctx.courses.map((c) => c.id));

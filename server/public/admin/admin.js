@@ -106,6 +106,7 @@ async function load() {
     if (tab === 'overview') await loadOverview();
     if (tab === 'users') await loadUsers();
     if (tab === 'invites') await loadInvites();
+    if (tab === 'mail') await loadMail();
     if (tab === 'settings') await loadSettings();
     if (tab === 'audit') await loadAudit();
   } catch (e) {
@@ -123,7 +124,8 @@ async function loadOverview() {
     stat('7 天活跃', o.active7d, `本周新注册 ${o.newUsers7d}`),
     stat('24 小时内同步过', o.synced24h, `${o.sessions} 个登录设备`),
     stat('今天同步', o.today.users, `${o.today.syncs} 次同步`),
-    stat('可用邀请码', o.invitesActive, '')
+    stat('通过 Brightspace 校验', o.verified, o.unverified ? `${o.unverified} 人还没通过` : '全部通过', o.unverified ? 'warn' : ''),
+    stat('今天发出提醒邮件', o.mail.configured ? o.mail.today.sent : '未开启', o.mail.configured ? `${o.remindersOn} 人开着提醒${o.mail.today.failed ? ` · ${o.mail.today.failed} 封失败` : ''}` : '去"邮件提醒"设置发信邮箱', o.mail.today.failed || !o.mail.configured ? 'warn' : '')
   );
   const max = Math.max(1, ...o.days.map((d) => d.users));
   $('ovChart').replaceChildren(...o.days.map((d) => h('div', { class: 'bar-col', title: `${d.date}：${d.users} 人同步，共 ${d.syncs} 次` },
@@ -137,7 +139,8 @@ async function loadOverview() {
   $('ovSettings').replaceChildren(
     h('div', {}, h('span', {}, '注册方式'), reg),
     h('div', {}, h('span', {}, '云同步'), onoff(s.flags.sync)),
-    h('div', {}, h('span', {}, '公告'), s.announcement || '无')
+    h('div', {}, h('span', {}, '公告'), s.announcement || '无'),
+    h('div', {}, h('span', {}, '发信邮箱'), s.mail?.configured ? `${s.mail.user}（${s.mail.host}）` : '未设置')
   );
 }
 
@@ -149,20 +152,43 @@ async function loadUsers() {
 
 function renderUsers() {
   const q = $('userQ').value.trim().toLowerCase();
-  const list = users.filter((u) => !q || `${u.name} ${u.email}`.toLowerCase().includes(q)).sort((a, b) => Date.parse(b.lastSeenAt || 0) - Date.parse(a.lastSeenAt || 0));
+  const list = users.filter((u) => !q || `${u.name} ${u.email} ${u.verify?.bsName || ''}`.toLowerCase().includes(q)).sort((a, b) => Date.parse(b.lastSeenAt || 0) - Date.parse(a.lastSeenAt || 0));
   $('usersSub').textContent = `${users.length} 个用户`;
-  const head = h('tr', {}, ...['用户', '角色', '最近活跃', '最近同步', '课程 / 事项 / 课件', '数据', ''].map((t, i) => h('th', { class: i >= 4 && i <= 5 ? 'num' : '' }, t)));
+  const head = h('tr', {}, ...['用户', 'Brightspace 校验', '角色', '最近活跃', '最近同步', '课程 / 事项 / 课件', '提醒邮件', ''].map((t, i) => h('th', { class: i === 5 || i === 6 ? 'num' : '' }, t)));
+  const VS = { ok: ['已通过', 'ok'], mismatch: ['姓名不一致', 'danger'], taken: ['账号被占用', 'danger'], pending: ['等待校验', 'neutral'] };
   const rows = list.map((u) => {
     const self = me && u.id === me.id;
     const act = async (fn, okMsg) => { try { await fn(); toast(okMsg); await loadUsers(); } catch (e) { toast(e.message); } };
     return h('tr', {},
       h('td', {}, h('div', { class: 'uname' }, u.name, self ? '（你）' : ''), h('div', { class: 'uemail' }, u.email), h('div', { class: 'muted' }, `注册于 ${date(u.createdAt)}${u.invitedWith ? ` · 邀请码 ${u.invitedWith}` : ''}`)),
+      h('td', {}, (() => {
+        const v = u.verify || { status: 'pending' };
+        const [label, tone] = VS[v.status] || VS.pending;
+        return h('div', { class: 'vchip' }, h('span', { class: `chip ${tone}` }, label + (v.manual ? '（手动）' : '')),
+          v.bsName ? h('small', {}, `Brightspace：${v.bsName}${v.uniqueName ? ` · ${v.uniqueName}` : ''}`) : null,
+          v.status !== 'ok' && v.reason ? h('small', {}, v.reason) : null,
+          v.checkedAt ? h('small', {}, `${ago(v.checkedAt)}检查`) : null);
+      })()),
       h('td', {}, u.disabled ? h('span', { class: 'chip danger' }, '已停用') : u.role === 'admin' ? h('span', { class: 'chip accent' }, '管理员') : h('span', { class: 'chip neutral' }, '用户')),
       h('td', { class: 'muted' }, ago(u.lastSeenAt)),
       h('td', { class: 'muted' }, ago(u.lastSyncAt)),
       h('td', { class: 'num' }, `${u.stats.courses} / ${u.stats.items} / ${u.stats.files}`),
-      h('td', { class: 'num muted' }, kb(u.storageBytes), h('div', {}, `${u.sessions} 台设备`)),
+      h('td', { class: 'num muted' }, u.reminders && !u.reminders.h24 && !u.reminders.h3 ? '已关闭' : `${u.reminderCount || 0} 封`, h('div', {}, u.lastReminderAt ? `最近 ${ago(u.lastReminderAt)}` : `${u.sessions} 台设备 · ${kb(u.storageBytes)}`)),
       h('td', {}, h('div', { class: 'actions' },
+        u.verify?.status !== 'ok' ? h('button', { type: 'button', class: 'btn small', onClick: () => {
+          if (!confirm(`确认 ${u.name} 是本人，手动通过 Brightspace 校验？\n他下次同步时会绑定当时登录的 Brightspace 账号。`)) return;
+          act(() => api('PATCH', `/api/admin/users/${u.id}`, { verify: 'approve' }), '已手动通过');
+        } }, '手动通过') : h('button', { type: 'button', class: 'btn small', title: '解除绑定，下次同步重新比对姓名', onClick: () => {
+          if (!confirm(`重置 ${u.name} 的 Brightspace 校验？下次同步时会重新比对姓名、重新绑定账号。`)) return;
+          act(() => api('PATCH', `/api/admin/users/${u.id}`, { verify: 'reset' }), '已重置');
+        } }, '重置校验'),
+        h('button', { type: 'button', class: 'btn small', onClick: () => {
+          const f = prompt('First name（和 Brightspace 一致）', u.firstName || '');
+          if (f == null) return;
+          const l = prompt('Last name（和 Brightspace 一致）', u.lastName || '');
+          if (l == null) return;
+          act(() => api('PATCH', `/api/admin/users/${u.id}`, { firstName: f, lastName: l }), '姓名已修改');
+        } }, '改姓名'),
         self ? null : h('button', { type: 'button', class: 'btn small', onClick: () => act(() => api('PATCH', `/api/admin/users/${u.id}`, { disabled: !u.disabled }), u.disabled ? '已恢复' : '已停用，对方已被退出登录') }, u.disabled ? '恢复' : '停用'),
         self ? null : h('button', { type: 'button', class: 'btn small', onClick: () => act(() => api('PATCH', `/api/admin/users/${u.id}`, { role: u.role === 'admin' ? 'user' : 'admin' }), '角色已修改') }, u.role === 'admin' ? '取消管理员' : '设为管理员'),
         h('button', { type: 'button', class: 'btn small', onClick: async () => {
@@ -179,7 +205,7 @@ function renderUsers() {
         } }, '删除')))
     );
   });
-  $('usersTable').replaceChildren(h('thead', {}, head), h('tbody', {}, ...(rows.length ? rows : [h('tr', {}, h('td', { colspan: 7, class: 'empty-row' }, '没有用户'))])));
+  $('usersTable').replaceChildren(h('thead', {}, head), h('tbody', {}, ...(rows.length ? rows : [h('tr', {}, h('td', { colspan: 8, class: 'empty-row' }, '没有用户'))])));
 }
 $('userQ').addEventListener('input', renderUsers);
 
@@ -233,8 +259,76 @@ $('settingsForm').addEventListener('submit', async (e) => {
   } catch (err) { toast(err.message); }
 });
 
+// ---------------- 邮件提醒 ----------------
+async function loadMail() {
+  const [o, { log }] = await Promise.all([api('GET', '/api/admin/overview'), api('GET', '/api/admin/mail-log')]);
+  const m = o.settings.mail || {};
+  const f = $('mailForm');
+  if (!f.dataset.loaded) {
+    f.host.value = m.host || '';
+    f.port.value = m.port || '';
+    f.user.value = m.user || '';
+    f.fromName.value = m.fromName || '';
+    f.secure.value = m.secure || 'ssl';
+    f.siteUrl.value = o.settings.siteUrl || '';
+    f.pass.placeholder = m.hasPass ? '已设置，不改就留空' : '还没设置';
+    f.dataset.loaded = '1';
+  }
+  const stat = (label, n, sub, cls = '') => h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, label), h('span', { class: `stat-num ${cls}` }, n), sub ? h('span', { class: 'stat-sub' }, sub) : null);
+  $('mailStats').replaceChildren(
+    stat('发信邮箱', m.configured ? '已设置' : '未设置', m.configured ? m.user : '设置好才会发提醒', m.configured ? '' : 'warn'),
+    stat('今天发出', o.mail.today.sent, o.mail.today.failed ? `${o.mail.today.failed} 封失败` : '没有失败', o.mail.today.failed ? 'warn' : ''),
+    stat('开着提醒的人', o.remindersOn, `共 ${o.verified} 人通过校验`),
+    stat('最近一次失败', o.mail.lastError ? '有' : '无', o.mail.lastError || '')
+  );
+  const KIND = { reminder: '截止提醒', test: '用户测试', 'admin-test': '后台测试' };
+  const head = h('tr', {}, ...['时间', '类型', '收件人', '标题', '结果'].map((t) => h('th', {}, t)));
+  const rows = log.map((x) => h('tr', {},
+    h('td', { class: 'muted' }, new Date(x.at).toLocaleString('zh-CN')),
+    h('td', {}, KIND[x.kind] || x.kind),
+    h('td', {}, x.to),
+    h('td', {}, x.subject),
+    h('td', {}, x.ok ? h('span', { class: 'chip ok' }, '已发送') : h('span', { class: 'chip danger', title: x.error }, `失败：${x.error}`))));
+  $('mailTable').replaceChildren(h('thead', {}, head), h('tbody', {}, ...(rows.length ? rows : [h('tr', {}, h('td', { colspan: 5, class: 'empty-row' }, '还没有发过邮件'))])));
+}
+
+$('mailForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    await api('PUT', '/api/admin/settings', {
+      siteUrl: f.siteUrl.value,
+      mail: { host: f.host.value, port: Number(f.port.value) || (f.secure.value === 'starttls' ? 587 : 465), user: f.user.value, pass: f.pass.value, fromName: f.fromName.value, secure: f.secure.value }
+    });
+    f.pass.value = '';
+    f.dataset.loaded = '';
+    $('mailSaved').textContent = `已保存 ${new Date().toLocaleTimeString('zh-CN')}`;
+    loadMail();
+  } catch (err) { toast(err.message); }
+});
+$('mailTest').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/api/admin/test-email', { to: $('mailForm').testTo.value });
+    toast(`测试邮件已发到 ${r.to}，去收件箱（或垃圾邮件）看看`);
+  } catch (err) {
+    dialog('发送失败', h('p', {}, err.message), h('p', { class: 'hint' }, 'Gmail 要用"应用专用密码"（不是登录密码），QQ 邮箱要用"授权码"。改完先点保存再测试。'));
+  } finally {
+    btn.disabled = false;
+    loadMail();
+  }
+});
+$('runReminders').addEventListener('click', async () => {
+  try {
+    const r = await api('POST', '/api/admin/run-reminders');
+    toast(r.reason === 'MAIL_OFF' ? '还没设置发信邮箱' : r.skipped ? '正在检查中，稍后再看' : `检查完成：发出 ${r.sent} 封${r.failed ? `，失败 ${r.failed} 封` : ''}`);
+    loadMail();
+  } catch (err) { toast(err.message); }
+});
+
 // ---------------- 操作记录 ----------------
-const ACTION = { register: '注册', invite: '生成邀请码', 'delete-invite': '删除邀请码', disable: '停用账号', enable: '恢复账号', role: '修改角色', 'reset-password': '重置密码', 'logout-all': '退出所有设备', 'delete-user': '删除用户', settings: '修改设置' };
+const ACTION = { 'verify-ok': '通过 Brightspace 校验', 'verify-mismatch': '校验不一致', 'verify-taken': 'Brightspace 账号被占用', 'verify-approve': '手动通过校验', 'verify-reset': '重置校验', rename: '修改姓名', register: '注册', invite: '生成邀请码', 'delete-invite': '删除邀请码', disable: '停用账号', enable: '恢复账号', role: '修改角色', 'reset-password': '重置密码', 'logout-all': '退出所有设备', 'delete-user': '删除用户', settings: '修改设置' };
 async function loadAudit() {
   const { audit } = await api('GET', '/api/admin/audit');
   const head = h('tr', {}, ...['时间', '操作', '操作人', '详情'].map((t) => h('th', {}, t)));
@@ -256,8 +350,8 @@ async function start() {
   $('login').hidden = true;
   $('app').hidden = false;
   const t = location.hash.slice(1);
-  setTab(['overview', 'users', 'invites', 'settings', 'audit'].includes(t) ? t : 'overview');
+  setTab(['overview', 'users', 'mail', 'invites', 'settings', 'audit'].includes(t) ? t : 'overview');
 }
 
-setInterval(() => { if (token && !document.hidden && (tab === 'overview' || tab === 'users')) load(); }, 15000);
+setInterval(() => { if (token && !document.hidden && (tab === 'overview' || tab === 'users' || tab === 'mail')) load(); }, 15000);
 start();

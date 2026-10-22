@@ -92,3 +92,13 @@ legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
   .who { margin-left: 0; }
   .small-search input { width: 140px; }
 }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+.field select { min-height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; background: var(--surface); color: inherit; font: inherit; }
+.test-to { min-height: 36px; border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; min-width: 220px; font: inherit; background: var(--surface); color: inherit; }
+.form-actions { flex-wrap: wrap; }
+.vchip { display: inline-flex; flex-direction: column; gap: 2px; }
+.vchip small { color: var(--muted); font-size: 11.5px; max-width: 260px; }
+.stat-num.warn { color: var(--warn); font-size: 22px; }
+.table-card .card-head { padding: 14px 16px 6px; }

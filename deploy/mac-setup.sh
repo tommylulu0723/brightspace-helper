@@ -15,7 +15,8 @@
 set -e
 
 REPO="${REPO:-tommylulu0723/brightspace-helper}"
-DIR="$HOME/CourseHelper"                       # 不放在"文稿/下载"里：macOS 不允许后台任务访问那些文件夹
+DIR="${DIR:-$HOME/CourseHelper}"               # 默认不放在"文稿/桌面/下载"里：macOS 不允许后台任务访问那些文件夹
+LOCDIR="$HOME/Library/Application Support/CourseHelper"
 LABEL="com.coursehelper.autoupdate"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME/Library/Logs/course-helper-update.log"
@@ -38,7 +39,7 @@ fi
 ok "git 已就绪"
 
 # 2. GitHub 访问令牌（私有仓库需要；公开仓库直接回车跳过）
-if [ ! -d "$DIR/.git" ]; then
+if [ ! -d "$DIR/.git" ] && ! GIT_TERMINAL_PROMPT=0 git ls-remote -q "https://github.com/$REPO.git" HEAD >/dev/null 2>&1; then
   echo
   echo "如果仓库是私有的，需要一个只读令牌（在 GitHub 网页上生成，见教程第 2 步）。"
   echo "粘贴令牌后回车（输入时屏幕上不显示，正常）；公开仓库直接回车："
@@ -60,6 +61,7 @@ else
   ok "代码已下载到 $DIR"
 fi
 [ -f "$DIR/extension/manifest.json" ] || fail "仓库里没找到 extension/manifest.json，代码可能还没推上去"
+mkdir -p "$LOCDIR" && printf "%s" "$DIR" > "$LOCDIR/location"
 
 # 4. 每分钟自动拉取
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
@@ -87,6 +89,7 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST"
 ok "每 15 秒自动检查更新（开机后也会自动运行）"
 
 printf "%s" "$DIR/extension" | pbcopy 2>/dev/null || true
+[ -n "$NO_CHROME" ] && { ok "安装完成：$DIR/extension"; exit 0; }
 open -a "Google Chrome" "chrome://extensions/" 2>/dev/null || echo "没找到 Chrome，请自己打开 Chrome，在地址栏输入 chrome://extensions"
 
 echo

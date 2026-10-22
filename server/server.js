@@ -8,8 +8,16 @@ import {
   hashPassword, verifyPassword, newToken, tokenHash, newId, newInviteCode, tempPassword,
   validEmail, passwordProblem, rateLimiter
 } from './lib/auth.js';
+import { namesMatch, displayName } from './lib/names.js';
+import { sendMail, smtpConfigured } from './lib/mailer.js';
+import { pickReminders, pruneSent, buildReminderEmail, itemKey } from './lib/reminders.js';
 
-export const SERVER_VERSION = '1.0.0';
+// 和插件共用"是否已完成"的判断：Docker 里在 ./shared/lib，源码里在 ../extension/src/lib
+const __here = path.dirname(fileURLToPath(import.meta.url));
+const FORMAT_JS = [path.join(__here, 'shared/lib/format.js'), path.join(__here, '../extension/src/lib/format.js')].find((f) => fs.existsSync(f));
+const { isDone } = await import(FORMAT_JS);
+
+export const SERVER_VERSION = '1.1.0';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SESSION_IDLE_DAYS = 60;
 const DAY = 24 * 3600 * 1000;
@@ -32,7 +40,7 @@ const MIME = {
   '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8'
 };
 
-export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dirname, 'data'), adminEmails = process.env.ADMIN_EMAILS || '', trustProxy = process.env.TRUST_PROXY !== '0', siteName = process.env.SITE_NAME || '课程助手' } = {}) {
+export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dirname, 'data'), adminEmails = process.env.ADMIN_EMAILS || '', trustProxy = process.env.TRUST_PROXY !== '0', siteName = process.env.SITE_NAME || '课程助手', reminderEveryMs = 5 * 60 * 1000, mailer = sendMail } = {}) {
   const db = createDb(dataDir);
   const D = () => db.data;
   const admins = new Set(adminEmails.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
@@ -41,7 +49,15 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
   const SHARED_LIB = [path.join(__dirname, 'shared'), path.join(__dirname, '..', 'extension', 'src')];
 
   // ---------------- 工具 ----------------
-  const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, createdAt: u.createdAt });
+  const publicUser = (u) => ({
+    id: u.id, email: u.email, name: u.name, firstName: u.firstName || '', lastName: u.lastName || '', role: u.role, createdAt: u.createdAt,
+    verify: u.verify || { status: 'pending' },
+    reminders: { h24: u.reminders?.h24 !== false, h3: u.reminders?.h3 !== false },
+    mustChangePassword: !!u.mustChangePassword
+  });
+  const verified = (u) => u.verify?.status === 'ok';
+  const mailCfg = () => D().settings.mail || {};
+  const siteUrl = (req) => D().settings.siteUrl || (req ? `https://${req.headers.host}` : '');
 
   function clientIp(req) {
     if (trustProxy) {
@@ -135,6 +151,73 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     return token;
   }
 
+  function publicSettingsAdmin() {
+    const s = D().settings;
+    const { pass, ...mail } = s.mail || {};
+    return { ...s, mail: { ...mail, hasPass: !!pass, configured: smtpConfigured(s.mail) } };
+  }
+
+  // ---------------- 发信 ----------------
+  async function deliver(to, msg, { kind = 'reminder', userId = null } = {}) {
+    const cfg = mailCfg();
+    const day = today();
+    const st = ((D().mailStats ||= {})[day] ||= { sent: 0, failed: 0 });
+    for (const k of Object.keys(D().mailStats)) if (Date.now() - Date.parse(k) > 30 * DAY) delete D().mailStats[k];
+    const log = (D().mailLog ||= []);
+    try {
+      await mailer(cfg, { to, ...msg });
+      st.sent += 1;
+      log.unshift({ at: new Date().toISOString(), to, subject: msg.subject, kind, ok: true, userId });
+    } catch (e) {
+      st.failed += 1;
+      log.unshift({ at: new Date().toISOString(), to, subject: msg.subject, kind, ok: false, error: e.message, userId });
+      throw e;
+    } finally {
+      if (log.length > 200) log.length = 200;
+      db.save();
+    }
+  }
+
+  let reminderRunning = false;
+  async function runReminders(now = new Date()) {
+    if (reminderRunning) return { skipped: true };
+    if (!smtpConfigured(mailCfg())) return { ok: false, reason: 'MAIL_OFF', sent: 0 };
+    reminderRunning = true;
+    let sent = 0;
+    let failed = 0;
+    try {
+      for (const u of D().users) {
+        if (u.disabled || !verified(u)) continue;
+        if (u.reminders?.h24 === false && u.reminders?.h3 === false) continue;
+        const st = db.readState(u.id);
+        if (!st.snapshot) continue;
+        const picks = pickReminders({
+          snapshot: st.snapshot, overrides: st.overrides || {}, hiddenCourseIds: st.settings?.hiddenCourseIds || [],
+          sent: st.reminded || {}, prefs: u.reminders || {}, now, isDone
+        });
+        if (!picks.length) continue;
+        const mail = buildReminderEmail({ name: u.firstName || u.name, picks, now, siteUrl: siteUrl(), snapshotAt: st.snapshotAt || 0 });
+        try {
+          await deliver(u.email, mail, { kind: 'reminder', userId: u.id });
+          const fresh = db.readState(u.id); // 发信期间插件可能刚上传过，重新读一次再写
+          const reminded = pruneSent(fresh.reminded || {}, now);
+          for (const p of picks) reminded[`${itemKey(p.item)}|${p.window}`] = now.toISOString();
+          fresh.reminded = reminded;
+          db.writeState(u.id, fresh);
+          u.reminderCount = (u.reminderCount || 0) + 1;
+          u.lastReminderAt = now.toISOString();
+          sent += 1;
+        } catch {
+          failed += 1; // 下一轮（5 分钟后）再试；失败原因记在发信记录里
+        }
+      }
+    } finally {
+      reminderRunning = false;
+      db.save();
+    }
+    return { ok: true, sent, failed };
+  }
+
   function flagsFor() {
     return { sync: D().settings.flags.sync !== false };
   }
@@ -160,8 +243,11 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
   route('POST', '/api/auth/register', async ({ req, body }) => {
     if (!authLimit(`auth:${clientIp(req)}`)) throw new HttpError(429, '尝试次数太多，过 15 分钟再试');
     const email = str(body.email, 120).toLowerCase();
-    const name = str(body.name, 40) || email.split('@')[0];
+    const firstName = str(body.firstName, 40);
+    const lastName = str(body.lastName, 40);
     const password = String(body.password || '');
+    if (!firstName || !lastName) throw new HttpError(400, '请填写 First name 和 Last name（要和 Brightspace 上的一致）');
+    const name = displayName(firstName, lastName);
     if (!validEmail(email)) throw new HttpError(400, '邮箱格式不对');
     const pp = passwordProblem(password);
     if (pp) throw new HttpError(400, pp);
@@ -181,7 +267,8 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     }
     const now = new Date().toISOString();
     const u = {
-      id: newId('u'), email, name, role: first || admins.has(email) ? 'admin' : 'user',
+      id: newId('u'), email, name, firstName, lastName, role: first || admins.has(email) ? 'admin' : 'user',
+      verify: { status: 'pending' }, reminders: { h24: true, h3: true },
       passwordHash: hashPassword(password), disabled: false, createdAt: now, lastSeenAt: now, lastSyncAt: null,
       invitedWith: invite ? invite.code : null
     };
@@ -219,9 +306,67 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
 
   route('PATCH', '/api/me', ({ req, body }) => {
     const { user } = authenticate(req);
-    if (body.name != null) user.name = str(body.name, 40) || user.name;
+    // 校验通过后不能自己改名字（要改找管理员），没通过时可以改正拼写
+    if ((body.firstName != null || body.lastName != null) && !verified(user)) {
+      const f = str(body.firstName ?? user.firstName, 40);
+      const l = str(body.lastName ?? user.lastName, 40);
+      if (!f || !l) throw new HttpError(400, 'First name 和 Last name 都要填');
+      user.firstName = f;
+      user.lastName = l;
+      user.name = displayName(f, l);
+      user.verify = { status: 'pending' };
+    }
+    if (body.reminders && typeof body.reminders === 'object') {
+      user.reminders = { h24: body.reminders.h24 !== false, h3: body.reminders.h3 !== false };
+    }
     db.save();
     return { user: publicUser(user) };
+  });
+
+  // 插件读到 Brightspace 上的姓名后调用：一致才放行，并把这个 Brightspace 账号绑定到这个注册账号
+  route('POST', '/api/me/verify', ({ req, body }) => {
+    const { user } = authenticate(req);
+    const bs = { firstName: str(body.firstName, 60), lastName: str(body.lastName, 60) };
+    const bsId = str(body.identifier, 40);
+    const uniqueName = str(body.uniqueName, 60);
+    if (!bs.firstName && !bs.lastName) throw new HttpError(400, '没读到 Brightspace 上的姓名');
+    const prev = user.verify || {};
+    const now = new Date().toISOString();
+    const bsName = displayName(bs.firstName, bs.lastName);
+    let status;
+    let reason = '';
+    const other = bsId && D().users.find((u) => u.id !== user.id && u.verify?.bsId === bsId && verified(u));
+    if (other) {
+      status = 'taken';
+      reason = '这个 Brightspace 账号已经绑定了另一个课程助手账号';
+    } else if (prev.bsId && bsId && prev.bsId !== bsId) {
+      status = 'mismatch';
+      reason = '现在登录的 Brightspace 账号和之前绑定的不是同一个人';
+    } else if (prev.manual || namesMatch(user, bs)) {
+      status = 'ok';
+    } else {
+      status = 'mismatch';
+      reason = `注册的姓名（${user.name}）和 Brightspace 上的姓名（${bsName}）不一致`;
+    }
+    const changed = prev.status !== status;
+    user.verify = { status, reason, bsName, bsId: status === 'ok' ? bsId || prev.bsId || '' : prev.bsId || '', uniqueName, checkedAt: now, manual: !!prev.manual };
+    if (changed) db.audit(`verify-${status}`, user.email, status === 'ok' ? bsName : reason);
+    db.save();
+    return { user: publicUser(user) };
+  });
+
+  const testLimit = rateLimiter({ windowMs: 60 * 60 * 1000, max: 3 });
+  route('POST', '/api/me/test-email', async ({ req }) => {
+    const { user } = authenticate(req);
+    if (!verified(user)) throw new HttpError(403, '先完成 Brightspace 姓名校验', 'NOT_VERIFIED');
+    if (!smtpConfigured(mailCfg())) throw new HttpError(503, '管理员还没设置发信邮箱，暂时发不了邮件', 'MAIL_OFF');
+    if (!testLimit(`test:${user.id}`)) throw new HttpError(429, '一小时最多发 3 封测试邮件');
+    await deliver(user.email, {
+      subject: '课程助手：测试邮件',
+      text: `${user.name}，你好：\n\n收到这封邮件说明截止提醒能正常发到这个邮箱。截止前 24 小时和 3 小时，课程助手会把还没交的作业 / 测验发到这里。\n\n—— 课程助手`,
+      html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6"><p>${user.name.replace(/[<>&]/g, '')}，你好：</p><p>收到这封邮件说明截止提醒能正常发到这个邮箱。截止前 24 小时和 3 小时，课程助手会把还没交的作业 / 测验发到这里。</p><p style="color:#6b7280">—— 课程助手</p></div>`
+    }, { kind: 'test', userId: user.id });
+    return { ok: true };
   });
 
   route('POST', '/api/me/password', ({ req, body }) => {
@@ -236,8 +381,16 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     return { ok: true };
   });
 
+  function requireVerified(user) {
+    if (!verified(user)) {
+      const v = user.verify || {};
+      throw new HttpError(403, v.status === 'mismatch' || v.status === 'taken' ? v.reason : '请先在电脑上的课程助手插件里登录 Brightspace，完成姓名校验', 'NOT_VERIFIED');
+    }
+  }
+
   route('GET', '/api/state', ({ req }) => {
     const { user } = authenticate(req);
+    requireVerified(user);
     const s = db.readState(user.id);
     return {
       overrides: s.overrides || {}, overridesAt: s.overridesAt || 0,
@@ -248,6 +401,10 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
 
   route('PUT', '/api/state', async ({ req, body }) => {
     const { user } = authenticate(req);
+    requireVerified(user);
+    // 快照里的 Brightspace 账号必须是绑定的那个
+    const snapId = str(body.snapshot?.user?.id, 40);
+    if (snapId && user.verify?.bsId && snapId !== user.verify.bsId) throw new HttpError(403, '现在登录的 Brightspace 账号和绑定的不是同一个人', 'NOT_VERIFIED');
     if (D().settings.flags.sync === false) throw new HttpError(403, '管理员暂时关闭了云同步', 'SYNC_OFF');
     const s = db.readState(user.id);
     let changed = false;
@@ -305,8 +462,12 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       newUsers7d: users.filter((u) => now - Date.parse(u.createdAt) < 7 * DAY).length,
       today: t,
       days,
-      settings: D().settings,
+      settings: publicSettingsAdmin(),
       invitesActive: D().invites.filter((i) => i.usesLeft > 0).length,
+      verified: users.filter(verified).length,
+      unverified: users.filter((u) => !verified(u)).length,
+      mail: { configured: smtpConfigured(mailCfg()), today: D().mailStats?.[today()] || { sent: 0, failed: 0 }, lastError: (D().mailLog || []).find((m) => !m.ok)?.error || '' },
+      remindersOn: users.filter((u) => verified(u) && (u.reminders?.h24 !== false || u.reminders?.h3 !== false)).length,
       sessions: D().sessions.length,
       serverTime: new Date().toISOString()
     };
@@ -322,6 +483,8 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
         lastSyncAt: u.lastSyncAt,
         stats: u.stats || { courses: 0, items: 0, files: 0 },
         invitedWith: u.invitedWith,
+        reminderCount: u.reminderCount || 0,
+        lastReminderAt: u.lastReminderAt || null,
         sessions: D().sessions.filter((s) => s.userId === u.id).length,
         storageBytes: db.stateSize(u.id)
       }))
@@ -347,7 +510,21 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       if (u.role !== body.role) db.audit('role', me.email, `${u.email} → ${body.role}`);
       u.role = body.role;
     }
-    if (body.name != null) u.name = str(body.name, 40) || u.name;
+    if (body.firstName != null || body.lastName != null) {
+      u.firstName = str(body.firstName ?? u.firstName, 40) || u.firstName;
+      u.lastName = str(body.lastName ?? u.lastName, 40) || u.lastName;
+      u.name = displayName(u.firstName, u.lastName);
+      db.audit('rename', me.email, `${u.email} → ${u.name}`);
+    }
+    if (body.verify === 'approve') {
+      // 姓名拼法和 Brightspace 不一样但确认是本人：手动通过，下次插件校验时绑定 Brightspace 账号
+      u.verify = { ...(u.verify || {}), status: 'ok', manual: true, reason: '', checkedAt: new Date().toISOString() };
+      db.audit('verify-approve', me.email, u.email);
+    }
+    if (body.verify === 'reset') {
+      u.verify = { status: 'pending' };
+      db.audit('verify-reset', me.email, u.email);
+    }
     db.save();
     return { ok: true };
   });
@@ -413,8 +590,41 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       if (typeof body.flags.sync === 'boolean') s.flags.sync = body.flags.sync;
     }
     if (body.announcement != null) s.announcement = str(body.announcement, 300);
-    if (JSON.stringify(s) !== before) db.audit('settings', me.email, JSON.stringify({ registration: s.registration, flags: s.flags }));
-    return { settings: s };
+    if (body.siteUrl != null) s.siteUrl = str(body.siteUrl, 200).replace(/\/+$/, '');
+    if (body.mail && typeof body.mail === 'object') {
+      const m = { ...(s.mail || {}) };
+      for (const k of ['host', 'user', 'from', 'fromName']) if (body.mail[k] != null) m[k] = str(body.mail[k], 120);
+      if (body.mail.port != null) m.port = num(body.mail.port, 65535) || 465;
+      if (['ssl', 'starttls'].includes(body.mail.secure)) m.secure = body.mail.secure;
+      if (body.mail.pass) m.pass = String(body.mail.pass).replace(/\s+/g, '').slice(0, 200); // Gmail 应用专用密码带空格，去掉
+      if (body.mail.clear === true) delete m.pass;
+      s.mail = m;
+    }
+    if (JSON.stringify(s) !== before) db.audit('settings', me.email, JSON.stringify({ registration: s.registration, flags: s.flags, mail: s.mail?.host ? `${s.mail.user}@${s.mail.host}` : '' }));
+    db.save();
+    return { settings: publicSettingsAdmin() };
+  });
+
+  route('POST', '/api/admin/test-email', async ({ req, body }) => {
+    const { user: me } = authenticate(req, { admin: true });
+    const to = str(body.to, 120) || me.email;
+    if (!validEmail(to)) throw new HttpError(400, '收件邮箱格式不对');
+    try {
+      await deliver(to, { subject: '课程助手：发信测试', text: '这是一封测试邮件，收到说明发信邮箱设置正确。\n\n—— 课程助手管理后台' }, { kind: 'admin-test' });
+    } catch (e) {
+      throw new HttpError(502, e.message, 'MAIL_FAILED');
+    }
+    return { ok: true, to };
+  });
+
+  route('GET', '/api/admin/mail-log', ({ req }) => {
+    authenticate(req, { admin: true });
+    return { log: (D().mailLog || []).slice(0, 50) };
+  });
+
+  route('POST', '/api/admin/run-reminders', async ({ req }) => {
+    authenticate(req, { admin: true });
+    return await runReminders();
   });
 
   route('GET', '/api/admin/audit', ({ req }) => {
@@ -491,9 +701,11 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     if (D().sessions.length !== before) db.save();
   }, 6 * 3600 * 1000);
   cleaner.unref();
-  server.on('close', () => { clearInterval(cleaner); db.flush(); });
+  const ticker = reminderEveryMs > 0 ? setInterval(() => { runReminders().catch((e) => console.error('提醒邮件出错', e)); }, reminderEveryMs) : null;
+  ticker?.unref();
+  server.on('close', () => { clearInterval(cleaner); clearInterval(ticker); db.flush(); });
 
-  return { server, db };
+  return { server, db, runReminders };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
