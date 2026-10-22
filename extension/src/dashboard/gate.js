@@ -6,6 +6,7 @@ import { BASE_URL } from '../lib/api.js';
 import { getLang } from '../lib/i18n.js';
 
 let mode = 'login';
+let prefill = null; // 从"注册"切到"登录"时带过去的邮箱和提示
 let lastKey = '';
 let info = null;
 
@@ -35,7 +36,7 @@ function authForm(ctx) {
   const server = ctx.state.cloud?.server || DEFAULT_SERVER;
   const bs = ctx.state.data?.user;
   const reg = mode === 'register';
-  const err = h('p', { class: 'form-error', role: 'alert' }, ctx.state.cloud?.error || '');
+  const err = h('p', { class: 'form-error', role: 'alert' }, prefill?.msg || ctx.state.cloud?.error || '');
   const invite = h('label', { class: 'field' }, h('span', {}, '邀请码'), h('input', { name: 'invite', placeholder: '找管理员要，例如 ABCD-2345', autocomplete: 'off' }));
   invite.hidden = !(reg && info?.registration === 'invite');
   const form = h('form', { class: 'auth-form', novalidate: true });
@@ -48,7 +49,7 @@ function authForm(ctx) {
       h('span', {}, bs?.firstName
         ? `你的 Brightspace 显示的是：${bs.firstName} ${bs.lastName}。英文名、拼写和顺序都要一样，不一致的话注册后也无法使用。`
         : '包括英文名、拼写和顺序。插件会自动核对，不一致的话注册后也无法使用。')) : null,
-    h('label', { class: 'field' }, h('span', {}, '邮箱'), h('input', { name: 'email', type: 'email', autocomplete: 'username', required: true })),
+    h('label', { class: 'field' }, h('span', {}, '邮箱'), h('input', { name: 'email', type: 'email', autocomplete: 'username', required: true, value: prefill?.email || '' })),
     reg ? h('p', { class: 'hint tight' }, '截止提醒会发到这个邮箱（截止前 24 小时和 3 小时），也用它登录。') : null,
     h('label', { class: 'field' }, h('span', {}, reg ? '密码（至少 8 位）' : '密码'), h('input', { name: 'password', type: 'password', autocomplete: reg ? 'new-password' : 'current-password', required: true })),
     invite,
@@ -75,6 +76,21 @@ function authForm(ctx) {
       lastKey = '';
       ctx.store.sync(); // 读一次 Brightspace，同步完自动核对姓名
     } catch (x) {
+      // 邮箱已经注册过：直接用这个邮箱和密码登录；密码不对就切到登录页、把邮箱填好
+      if (reg && x.status === 409) {
+        try {
+          const r = await cloud.login(url, { email: f.get('email'), password: f.get('password') });
+          await ctx.store.set({ cloud: { server: url, token: r.token, user: r.user, flags: r.flags || {}, error: null } });
+          toast(`这个邮箱已经注册过，已帮你登录：${r.user.firstName || r.user.name}`);
+          lastKey = '';
+          ctx.store.sync();
+          return;
+        } catch {
+          mode = 'login'; prefill = { email: f.get('email'), msg: '这个邮箱已经注册过了，请输入当时设置的密码登录。' };
+          lastKey = ''; ctx.rerender();
+          return;
+        }
+      }
       err.textContent = x.message;
       if (x.code === 'INVITE_REQUIRED' || x.code === 'INVITE_INVALID') invite.hidden = false;
       btn.disabled = false;
@@ -156,9 +172,29 @@ export function renderGate(root, ctx, gate) {
       h('div', { class: 'name-compare' },
         h('div', {}, h('span', {}, '注册的姓名'), h('b', {}, u?.name || '—')),
         h('div', {}, h('span', {}, 'Brightspace 上的姓名'), h('b', {}, bs ? `${bs.firstName} ${bs.lastName}` : u?.verify?.bsName || '—'))),
-      differentAccount ? '' : '如果是拼写不同但确实是你本人（比如英文名 / 中文拼音），请联系管理员在后台修改姓名或手动通过。'
+      differentAccount || !bs?.firstName ? '' : '注册时名字填错了？点下面的按钮，把注册的姓名改成和 Brightspace 一样，马上重新核对。'
     ].filter(Boolean),
-    actions: [differentAccount ? h('a', { class: 'btn primary', href: `${BASE_URL}/d2l/home`, target: '_blank', rel: 'noopener' }, icon(I.external, 15), '打开 Brightspace') : null, retry].filter(Boolean)
+    actions: [
+      differentAccount ? h('a', { class: 'btn primary', href: `${BASE_URL}/d2l/home`, target: '_blank', rel: 'noopener' }, icon(I.external, 15), '打开 Brightspace') : null,
+      !differentAccount && bs?.firstName ? h('button', { type: 'button', class: 'btn primary', onClick: async (e) => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        b.textContent = '正在修改…';
+        const c = ctx.state.cloud;
+        try {
+          const out = await cloud.updateProfile(c.server, c.token, { firstName: bs.firstName, lastName: bs.lastName });
+          await ctx.store.set({ cloud: { ...c, user: out.user } });
+          lastKey = '';
+          await ctx.store.verify();
+          toast(`已改成 ${bs.firstName} ${bs.lastName}，正在重新核对…`);
+        } catch (x) {
+          toast(x.message);
+          b.disabled = false;
+          b.textContent = `改成 ${bs.firstName} ${bs.lastName}`;
+        }
+      } }, `改成 ${bs.firstName} ${bs.lastName}`) : null,
+      retry
+    ].filter(Boolean)
   }));
 }
 

@@ -7,6 +7,18 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.5.1',
+    d: '2026-10-22',
+    items: [
+      '修复：注册时名字填错会卡死。现在"姓名不一致"页面可以一键改成 Brightspace 上的姓名并马上重新核对',
+      '用已经注册过的邮箱再注册：密码对就直接登录，不对就切到登录页并填好邮箱'
+    ],
+    en: [
+      'Fixed: a typo in your name at sign-up could leave you stuck. The "name doesn\'t match" screen now lets you change it to your Brightspace name in one click and re-checks right away',
+      'Signing up again with an existing email logs you in if the password is right, otherwise switches to Log in with the email filled in'
+    ]
+  },
+  {
     v: '1.5.0',
     d: '2026-10-22',
     items: [
