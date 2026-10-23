@@ -354,19 +354,23 @@ async function cloudSync({ pushSnapshot = true } = {}) {
         return { ok: false, error: '还没通过 Brightspace 姓名校验', code: 'NOT_VERIFIED' };
       }
       const remote = await cloud.getState(c.server, c.token);
-      const merged = mergeState(
-        { overrides: st.overrides, overridesAt: st.overridesAt, settings: st.settings, settingsAt: st.settingsAt },
-        remote
-      );
+      // 网络请求期间你可能刚改过设置（比如移除了一门课）：合并前重新读一次本机最新的
+      const fresh = await chrome.storage.local.get(['overrides', 'overridesAt', 'settings', 'settingsAt', 'settingsTs']);
+      const merged = mergeState(fresh, remote);
       if (merged.changedLocal) {
+        const now = await chrome.storage.local.get(['settings', 'settingsTs']);
+        // 再保险一次：只覆盖合并时真正从服务器拿来的那几项
+        const keep = { ...(now.settings || {}) };
+        for (const [k, t] of Object.entries(merged.settingsTs || {})) if (t > ((now.settingsTs || {})[k] ?? 0)) keep[k] = merged.settings[k];
         await chrome.storage.local.set({
           overrides: merged.overrides, overridesAt: merged.overridesAt,
-          settings: merged.settings, settingsAt: merged.settingsAt
+          settings: keep, settingsAt: merged.settingsAt, settingsTs: { ...(now.settingsTs || {}), ...merged.settingsTs }
         });
+        merged.settings = keep;
       }
       const body = {
         overrides: merged.overrides, overridesAt: merged.overridesAt,
-        settings: publicSettings(merged.settings), settingsAt: merged.settingsAt
+        settings: publicSettings(merged.settings, merged.settingsTs), settingsAt: merged.settingsAt
       };
       if (pushSnapshot && st.data) {
         body.snapshot = compactSnapshot(withCustom(st.data, merged.settings)); // 自己添加的也上传：手机网页和提醒邮件都能看到
@@ -395,7 +399,11 @@ async function cloudSync({ pushSnapshot = true } = {}) {
 
 function scheduleCloudPush() {
   clearTimeout(cloudTimer);
-  cloudTimer = setTimeout(() => cloudSync({ pushSnapshot: true }), 3000);
+  cloudTimer = setTimeout(() => {
+    // 正在云同步时，等它结束再推一次（之前会直接被跳过，刚改的设置要等下一次才上传）
+    if (cloudRunning) cloudRunning.finally(() => cloudSync({ pushSnapshot: true }));
+    else cloudSync({ pushSnapshot: true });
+  }, 3000);
 }
 
 let running = null;

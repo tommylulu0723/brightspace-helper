@@ -27,8 +27,9 @@
   color-scheme: light;
 }
 
+/* 深色：跟随系统；也可以手动选（html 上的 data-theme="light" / "dark"） */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #111013;
     --surface: #1A191D;
     --surface-2: #201F24;
@@ -56,6 +57,34 @@
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+    --bg: #111013;
+    --surface: #1A191D;
+    --surface-2: #201F24;
+    --sunken: #0C0B0E;
+    --border: #2E2C33;
+    --border-soft: #26242A;
+    --ink: #EEECF1;
+    --ink-2: #CFCBD6;
+    --muted: #9C97A5;
+    --accent: #B98CEB;
+    --accent-hover: #C9A5F0;
+    --accent-ink: #160A22;
+    --accent-soft: #2A1E38;
+    --accent-text: #C9A5F0;
+    --warn: #F0B06A;
+    --warn-soft: #33240F;
+    --danger: #F49A90;
+    --danger-soft: #3A1A18;
+    --ok: #74D3C2;
+    --ok-soft: #12302B;
+    --neutral-soft: #26242A;
+    --neutral-ink: #D3CFDA;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }

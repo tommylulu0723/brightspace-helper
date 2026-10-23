@@ -7,6 +7,18 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.6.1',
+    d: '2026-10-23',
+    items: [
+      '修复：移除的课程同步后又出现。现在每个设置项单独记修改时间，同步时逐项合并，不会再被旧的设置覆盖',
+      '外观可以手动选：主页右上角的按钮在 跟随系统 / 浅色 / 深色 之间切换（设置 → 语言 里也能选）'
+    ],
+    en: [
+      'Fixed: removed courses coming back after a sync. Each setting now keeps its own timestamp and is merged field by field, so older settings can\'t overwrite newer ones',
+      'Pick light or dark yourself: the button at the top right cycles System / Light / Dark (also in Settings → Language)'
+    ]
+  },
+  {
     v: '1.6.0',
     d: '2026-10-23',
     items: [

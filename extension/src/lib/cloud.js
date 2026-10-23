@@ -94,16 +94,51 @@ export function mergeState(local, remote) {
   const ro = remote?.overridesAt || 0;
   out.overrides = ro > lo ? remote.overrides || {} : local.overrides || {};
   out.overridesAt = Math.max(lo, ro);
-  const ls = local.settingsAt || 0;
-  const rs = remote?.settingsAt || 0;
-  out.settings = rs > ls ? { ...local.settings, ...(remote.settings || {}) } : local.settings || {};
-  out.settingsAt = Math.max(ls, rs);
-  out.changedLocal = ro > lo || rs > ls;
+  const s = mergeSettings(local, remote);
+  out.settings = s.settings;
+  out.settingsTs = s.ts;
+  out.settingsAt = Math.max(local.settingsAt || 0, remote?.settingsAt || 0);
+  out.changedLocal = ro > lo || s.changed;
   return out;
 }
 
+// 会云同步的设置项
+export const SYNCED_KEYS = ['hiddenCourseIds', 'addedCourseIds', 'notify', 'lang', 'customItems', 'theme'];
+
+/**
+ * 设置逐项合并：每一项各自记修改时间（settingsTs），谁新用谁。
+ * 这样在一台设备上移除课程、同时别处改了语言，两边的改动都不会被对方整份覆盖掉。
+ * 旧版本上传的设置没有逐项时间，就按整份的 settingsAt 比较。
+ */
+export function mergeSettings(local = {}, remote = null) {
+  const ls = local.settings || {};
+  const lts = local.settingsTs || {};
+  const lat = local.settingsAt || 0;
+  const rs = remote?.settings || {};
+  const rat = remote?.settingsAt || 0;
+  const rts = rs._ts && typeof rs._ts === 'object' ? rs._ts : null;
+  const settings = { ...ls };
+  delete settings._ts;
+  const ts = { ...lts };
+  let changed = false;
+  for (const k of SYNCED_KEYS) {
+    const lt = lts[k] ?? lat;                    // 本机没有逐项时间（旧数据）：用整份的时间
+    const rt = rts ? rts[k] ?? 0 : (k in rs ? rat : 0);
+    if (rt > lt && JSON.stringify(rs[k]) !== JSON.stringify(ls[k])) {
+      if (rs[k] === undefined) delete settings[k]; else settings[k] = rs[k];
+      ts[k] = rt;
+      changed = true;
+    } else if (rt > lt) {
+      ts[k] = rt;
+    }
+  }
+  return { settings, ts, changed };
+}
+
 /** 要同步到服务器的设置（白名单） */
-export function publicSettings(settings = {}) {
-  const { hiddenCourseIds, addedCourseIds, notify, lang, customItems } = settings;
-  return { hiddenCourseIds, addedCourseIds, notify, lang, customItems };
+export function publicSettings(settings = {}, ts = null) {
+  const out = {};
+  for (const k of SYNCED_KEYS) out[k] = settings[k];
+  if (ts) out._ts = Object.fromEntries(SYNCED_KEYS.map((k) => [k, ts[k] || 0]));
+  return out;
 }

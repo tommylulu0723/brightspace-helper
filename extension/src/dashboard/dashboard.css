@@ -480,3 +480,10 @@ body.locked .lang-mini { display: inline-flex !important; margin-left: auto; }
 .dialog:has(.custom-form) { max-width: 520px; }
 .custom-form { min-width: 0; }
 .sync-every { justify-content: space-between; gap: 12px; } .mini-select { min-height: 32px; border: 1px solid var(--border); border-radius: 8px; padding: 0 8px; background: var(--surface); color: inherit; font: inherit; }
+
+.theme-btn { width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); cursor: pointer; flex: none; }
+.theme-btn:hover { color: var(--ink); border-color: var(--accent); }
+body.locked .theme-btn { display: inline-grid !important; }
+body.locked .theme-btn + .lang-mini { margin-left: 0; }
+body.locked .theme-btn { margin-left: auto; }
+.theme-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }

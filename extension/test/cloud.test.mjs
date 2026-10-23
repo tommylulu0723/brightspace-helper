@@ -17,10 +17,30 @@ await test('谁新用谁：服务器的"标记完成"更新时拉下来，本机
   assert.equal(m.changedLocal, true);
   assert.equal(mergeState(local, null).changedLocal, false);
 });
+await test('设置逐项合并：这边移除课程、那边改语言，两边都保留', () => {
+  const local = { settings: { hiddenCourseIds: ['1', '2'], lang: 'zh' }, settingsTs: { hiddenCourseIds: 500, lang: 100 }, settingsAt: 500 };
+  const remote = { settings: { hiddenCourseIds: ['1'], lang: 'en', _ts: { hiddenCourseIds: 300, lang: 400 } }, settingsAt: 400 };
+  const m = mergeState(local, remote);
+  assert.deepEqual(m.settings.hiddenCourseIds, ['1', '2'], '本机刚移除的课不会被服务器上旧的列表覆盖');
+  assert.equal(m.settings.lang, 'en');
+  assert.equal(m.changedLocal, true);
+  assert.ok(!('_ts' in m.settings));
+});
+await test('旧服务器数据没有逐项时间：按整份时间比较，不会把本机更新的覆盖掉', () => {
+  const local = { settings: { hiddenCourseIds: ['1', '2'] }, settingsAt: 900 };
+  const remote = { settings: { hiddenCourseIds: [] }, settingsAt: 800 };
+  assert.deepEqual(mergeState(local, remote).settings.hiddenCourseIds, ['1', '2']);
+  assert.equal(mergeState(local, remote).changedLocal, false);
+});
+await test('上传时带上逐项时间', () => {
+  const p = publicSettings({ hiddenCourseIds: ['1'] }, { hiddenCourseIds: 42 });
+  assert.equal(p._ts.hiddenCourseIds, 42);
+  assert.equal(p._ts.lang, 0);
+});
 await test('上传的设置只有白名单字段（不会带上 API key）', () => {
   const p = publicSettings({ hiddenCourseIds: ['1'], notify: true, anthropicKey: 'sk-ant-secret', somethingElse: 1 });
   assert.ok(!JSON.stringify(p).includes('secret'));
-  assert.deepEqual(Object.keys(p).sort(), ['addedCourseIds', 'customItems', 'hiddenCourseIds', 'lang', 'notify']);
+  assert.deepEqual(Object.keys(p).sort(), ['addedCourseIds', 'customItems', 'hiddenCourseIds', 'lang', 'notify', 'theme']);
 });
 await test('快照去掉下载地址和判断依据，体积更小', () => {
   const s = compactSnapshot({

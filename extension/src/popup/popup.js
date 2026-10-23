@@ -6,7 +6,7 @@ import { unreadCount } from '../lib/feed.js';
 import { gateState, isBlocking } from '../lib/gate.js';
 import { withCustom } from '../lib/custom.js';
 import { REQUIRE_LOGIN } from '../config.js';
-import { loadLang } from '../lang.js';
+import { loadLang, loadTheme } from '../lang.js';
 import { translatePage, getLang, setLang } from '../lib/i18n.js';
 
 const store = createStore();
@@ -141,7 +141,7 @@ $('matBtn').addEventListener('click', async () => {
   window.close();
 });
 
-if (!store.demo) await loadLang(); else setLang(new URLSearchParams(location.search).get('lang') || 'zh');
+if (!store.demo) { await loadLang(); await loadTheme(); } else setLang(new URLSearchParams(location.search).get('lang') || 'zh');
 translatePage(document.body);
 store.onChanged(render);
 render();

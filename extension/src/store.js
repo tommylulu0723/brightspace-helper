@@ -11,6 +11,14 @@ export function createStore() {
       demo: false,
       get: (keys) => chrome.storage.local.get(keys),
       set: (obj) => chrome.storage.local.set(obj),
+      // 改设置：先读本机最新的再改（不用页面里可能过时的那份），并记下每一项的修改时间
+      setSettings: async (patch) => {
+        const { settings = {}, settingsTs = {} } = await chrome.storage.local.get(['settings', 'settingsTs']);
+        const now = Date.now();
+        const ts = { ...settingsTs };
+        for (const k of Object.keys(patch)) ts[k] = now;
+        await chrome.storage.local.set({ settings: { ...settings, ...patch }, settingsTs: ts, settingsAt: now });
+      },
       onChanged: (fn) => chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local') fn(changes); }),
       sync: (opts = {}) => chrome.runtime.sendMessage({ type: 'sync', ...opts }),
       cloudSync: () => chrome.runtime.sendMessage({ type: 'cloudSync' }),
@@ -37,6 +45,10 @@ export function createStore() {
       emit(Object.fromEntries(Object.keys(obj).map((k) => [k, { newValue: obj[k] }])));
     },
     onChanged: (fn) => listeners.push(fn),
+    setSettings: async (patch) => {
+      mem.settings = { ...mem.settings, ...patch };
+      emit({ settings: { newValue: mem.settings } });
+    },
     sync: async () => {
       await new Promise((r) => setTimeout(r, 800));
       const hidden = mem.settings.hiddenCourseIds || [];

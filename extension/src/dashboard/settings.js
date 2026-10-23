@@ -205,7 +205,7 @@ function passwordDialog(c) {
 
 // ---------------- 课程管理 ----------------
 export async function setCourseSynced(ctx, course, on) {
-  const s = ctx.state.settings || {};
+  const { settings: s = {} } = await ctx.store.get(['settings']); // 读最新的，连着移除几门课也不会互相覆盖
   const hidden = new Set(s.hiddenCourseIds || []);
   const added = new Set(s.addedCourseIds || []);
   if (on) {
@@ -215,7 +215,7 @@ export async function setCourseSynced(ctx, course, on) {
     added.delete(course.id);
     if (course.auto !== false) hidden.add(course.id);
   }
-  await ctx.store.set({ settings: { ...s, hiddenCourseIds: [...hidden], addedCourseIds: [...added] }, settingsAt: Date.now() });
+  await ctx.store.setSettings({ hiddenCourseIds: [...hidden], addedCourseIds: [...added] });
   ctx.scheduleResync();
 }
 
@@ -272,7 +272,7 @@ function renderNotify(body, ctx) {
   const s = ctx.state.settings || {};
   const row = (key, label, hint, def = true) => {
     const input = h('input', { type: 'checkbox', checked: def ? s[key] !== false : !!s[key] });
-    input.addEventListener('change', () => ctx.store.set({ settings: { ...(ctx.state.settings || {}), [key]: input.checked }, settingsAt: Date.now() }));
+    input.addEventListener('change', () => ctx.store.setSettings({ [key]: input.checked }));
     return h('label', { class: 'check-row' }, input, h('span', {}, h('b', {}, label), hint ? h('span', { class: 'muted' }, ` · ${hint}`) : null));
   };
   fill(body,
@@ -286,7 +286,7 @@ function renderNotify(body, ctx) {
 function syncEveryRow(s, ctx) {
   const cur = [5, 10, 30].includes(s.syncEvery) ? s.syncEvery : 10;
   const sel = h('select', { class: 'mini-select', 'aria-label': '自动同步间隔' }, ...[5, 10, 30].map((m) => h('option', { value: m, selected: m === cur }, `每 ${m} 分钟`)));
-  sel.addEventListener('change', () => ctx.store.set({ settings: { ...(ctx.state.settings || {}), syncEvery: Number(sel.value) }, settingsAt: Date.now() }));
+  sel.addEventListener('change', () => ctx.store.setSettings({ syncEvery: Number(sel.value) }));
   return h('div', { class: 'check-row sync-every' },
     h('span', {}, h('b', {}, '自动同步'), h('span', { class: 'muted' }, ' · 另外打开插件、在 Brightspace 交完作业、电脑从休眠回来时也会马上同步')),
     sel);
@@ -327,7 +327,7 @@ function renderLang(body, ctx) {
   const cur = getLang();
   const pick = async (l) => {
     if (l === cur) return;
-    await ctx.store.set({ settings: { ...(ctx.state.settings || {}), lang: l }, settingsAt: Date.now() });
+    await ctx.store.setSettings({ lang: l });
     const c = ctx.state.cloud;
     if (c?.token) { try { await cloud.updateProfile(c.server, c.token, { lang: l }); } catch { /* 下次同步再说 */ } }
     location.reload();
@@ -336,7 +336,19 @@ function renderLang(body, ctx) {
     h('div', { class: 'seg lang-seg', role: 'group', 'aria-label': 'Language', 'data-no-tr': '' },
       h('button', { type: 'button', 'aria-pressed': String(cur === 'zh'), onClick: () => pick('zh') }, '中文'),
       h('button', { type: 'button', 'aria-pressed': String(cur === 'en'), onClick: () => pick('en') }, 'English')),
-    h('p', { class: 'hint' }, '界面语言，切换后立即生效；提醒邮件也会用这个语言。'));
+    h('p', { class: 'hint' }, '界面语言，切换后立即生效；提醒邮件也会用这个语言。'),
+    themeRow(ctx));
+}
+
+function themeRow(ctx) {
+  const cur = ctx.state.settings?.theme || 'auto';
+  const btn = (t, label) => h('button', { type: 'button', 'aria-pressed': String(cur === t), onClick: async () => {
+    const { applyTheme } = await import('../lang.js');
+    applyTheme(t);
+    await ctx.store.setSettings({ theme: t });
+  } }, label);
+  return h('div', { class: 'theme-row' }, h('b', {}, '外观'),
+    h('div', { class: 'seg' }, btn('auto', '跟随系统'), btn('light', '浅色'), btn('dark', '深色')));
 }
 
 /** ctx: { state, store, rerender, scheduleResync, copyDiagnostics } */
@@ -345,7 +357,7 @@ export function renderSettingsView(root, ctx) {
   once('courses', [st.data?.allCourses, st.data?.courses?.map((c) => c.id), st.settings?.hiddenCourseIds, st.settings?.addedCourseIds], () =>
     renderCourses(section(root, 'courses', '课程管理', '移除不重要的课（比如社团、培训类"课程"），或者把没被自动识别的课加回来。改完会自动重新同步截止时间和课件。'), ctx));
   section(root, 'courses', '课程管理');
-  once('lang', [getLang()], () => renderLang(section(root, 'lang', '语言 / Language'), ctx));
+  once('lang', [getLang(), st.settings?.theme], () => renderLang(section(root, 'lang', '语言 / Language'), ctx));
   section(root, 'lang', '语言 / Language');
   once('notify', [st.settings?.notify, st.settings?.notifyPlan, st.settings?.notifyUpdates, st.settings?.autoApplyUpdate, st.settings?.syncEvery], () => renderNotify(section(root, 'notify', '通知'), ctx));
   section(root, 'notify', '通知');

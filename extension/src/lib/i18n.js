@@ -246,6 +246,8 @@ const D = [
   ['{}（{}）· {}', '{0} ({1}) · {2}'], ['• {}', '• {}'],
   [' · {} 条新的', ' · {} new'], ['{} 条新的', '{} new'],
   ['· {}', '· {}'],
+  ['外观', 'Appearance'], ['外观：跟随系统', 'Appearance: match system'], ['外观：浅色', 'Appearance: light'], ['外观：深色', 'Appearance: dark'],
+  ['跟随系统', 'System'], ['浅色', 'Light'], ['深色', 'Dark'],
   ['自动同步', 'Auto sync'], ['自动同步间隔', 'Auto sync interval'], ['每 {} 分钟', 'Every {} min'],
   [' · 另外打开插件、在 Brightspace 交完作业、电脑从休眠回来时也会马上同步', ' · It also syncs right away when you open the extension, after you submit on Brightspace, and when your computer wakes up'],
   ['这个邮箱已经注册过，已帮你登录：{}', 'That email was already registered — logged you in: {}'],

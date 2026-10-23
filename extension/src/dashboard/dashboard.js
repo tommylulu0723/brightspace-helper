@@ -18,13 +18,14 @@ import { withCustom, upsertCustom, removeCustom, pruneCustom, MINE, CUSTOM_TYPES
 import { cloud as cloudApi } from '../lib/cloud.js';
 import { renderGate, resetGate } from './gate.js';
 import { REQUIRE_LOGIN } from '../config.js';
-import { loadLang } from '../lang.js';
+import { loadLang, loadTheme, applyTheme, THEMES } from '../lang.js';
 import { translatePage, getLang, setLang } from '../lib/i18n.js';
 
 const store = createStore();
 const $ = (id) => document.getElementById(id);
 const WEEKDAY = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const NEW_MS = 7 * 24 * 3600 * 1000;
+let THEME = 'auto'; // 外观：auto / light / dark
 const VIEWS = ['deadlines', 'updates', 'materials', 'grades', 'settings'];
 
 let state = { data: null, status: {}, overrides: {}, settings: {}, cloud: null, updates: [], seenAt: 0 };
@@ -354,7 +355,7 @@ function customDialog(existing = null) {
     err,
     h('div', { class: 'dialog-actions' },
       raw ? h('button', { type: 'button', class: 'btn danger left', onClick: async () => {
-        await saveCustom(removeCustom(state.settings.customItems, raw.id));
+        await saveCustom((list) => removeCustom(list, raw.id));
         dlg.close(); toast('已删除');
       } }, '删除') : null,
       h('button', { type: 'button', class: 'btn', onClick: () => dlg.close() }, '取消'),
@@ -367,8 +368,7 @@ function customDialog(existing = null) {
     const due = new Date(`${f.get('date')}T${f.get('time') || '23:59'}`);
     if (!title) { err.textContent = '先写个标题'; return; }
     if (!Number.isFinite(due.getTime())) { err.textContent = '日期或时间不对'; return; }
-    const list = upsertCustom(pruneCustom(state.settings.customItems || []), { ...(raw || {}), title, type: f.get('type'), courseId: f.get('courseId'), due, note: f.get('note') });
-    await saveCustom(list);
+    await saveCustom((list) => upsertCustom(pruneCustom(list), { ...(raw || {}), title, type: f.get('type'), courseId: f.get('courseId'), due, note: f.get('note') }));
     dlg.close();
     toast(raw ? '已保存' : `已添加：${title}`);
   });
@@ -378,14 +378,37 @@ function customDialog(existing = null) {
   form.querySelector('input[name=title]').focus();
 }
 
-async function saveCustom(list) {
-  await store.set({ settings: { ...(state.settings || {}), customItems: list }, settingsAt: Date.now() });
+async function saveCustom(change) {
+  const { settings = {} } = await store.get(['settings']);
+  await store.setSettings({ customItems: change(settings.customItems || []) });
+}
+
+// ---------------- 主页的外观切换（跟随系统 → 浅色 → 深色） ----------------
+const THEME_ICON = {
+  auto: ['M12 3a9 9 0 1 0 0 18z', 'M12 3a9 9 0 0 1 0 18'],
+  light: ['M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z', 'M12 1v2', 'M12 21v2', 'M4.2 4.2l1.4 1.4', 'M18.4 18.4l1.4 1.4', 'M1 12h2', 'M21 12h2', 'M4.2 19.8l1.4-1.4', 'M18.4 5.6l1.4-1.4'],
+  dark: ['M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z']
+};
+const THEME_LABEL = { auto: '外观：跟随系统', light: '外观：浅色', dark: '外观：深色' };
+function paintThemeBtn() {
+  const b = $('themeBtn');
+  if (!b) return;
+  fill(b, icon(THEME_ICON[THEME] || THEME_ICON.auto, 16));
+  b.title = THEME_LABEL[THEME];
+  b.setAttribute('aria-label', THEME_LABEL[THEME]);
+}
+async function cycleTheme() {
+  THEME = THEMES[(THEMES.indexOf(THEME) + 1) % THEMES.length];
+  applyTheme(THEME);
+  paintThemeBtn();
+  toast(THEME_LABEL[THEME]);
+  await store.setSettings({ theme: THEME });
 }
 
 // ---------------- 主页的语言切换 ----------------
 async function switchLang(l) {
   if (l === getLang()) return;
-  await store.set({ settings: { ...(state.settings || {}), lang: l }, settingsAt: Date.now() });
+  await store.setSettings({ lang: l });
   const c = state.cloud;
   if (c?.token) { try { await cloudApi.updateProfile(c.server, c.token, { lang: l }); } catch { /* 下次同步再改 */ } }
   location.reload();
@@ -805,6 +828,7 @@ $('manageCourses').addEventListener('click', () => openSettings('courses'));
 $('syncBtn').addEventListener('click', () => doSync());
 $('icsBtn').addEventListener('click', exportIcs);
 $('addBtn').addEventListener('click', () => customDialog());
+$('themeBtn').addEventListener('click', cycleTheme);
 for (const b of document.querySelectorAll('#langMini [data-lang]')) b.addEventListener('click', () => switchLang(b.dataset.lang));
 $('matRefresh').addEventListener('click', () => { toast('正在重新读取所有课程的课件…'); doSync({ forceMaterials: true }); });
 $('hideDone').addEventListener('change', (e) => { ui.hideDone = e.target.checked; saveUi(); render(); });
@@ -817,10 +841,14 @@ window.addEventListener('hashchange', () => {
 });
 
 // 演示模式（直接打开 html）可以用 ?lang=en 预览英文
+THEME = store.demo ? 'auto' : await loadTheme();
+paintThemeBtn();
 const LANG = store.demo ? (setLang(new URLSearchParams(location.search).get('lang') || 'zh'), getLang()) : await loadLang();
 for (const b of document.querySelectorAll('#langMini [data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === getLang()));
 translatePage(document.body);
 store.onChanged((ch) => {
+  const nt = ch?.settings?.newValue?.theme;
+  if (nt && nt !== THEME) { THEME = nt; applyTheme(nt); paintThemeBtn(); }
   // 在别处（比如另一个标签页）切换了语言：整页重新加载
   if (ch?.settings && (ch.settings.newValue?.lang || 'x') !== (ch.settings.oldValue?.lang || 'x') && ch.settings.newValue?.lang && ch.settings.newValue.lang !== LANG) { location.reload(); return; }
   load();
