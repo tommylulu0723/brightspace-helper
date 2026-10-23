@@ -7,6 +7,22 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.7.0',
+    d: '2026-10-23',
+    items: [
+      '未来 7 天一览：一眼看出哪天作业扎堆，点某一天只看那天的',
+      '遇到问题可以直接在插件里反馈（右上角 💬），回复也会显示在这里',
+      '第一次使用有简单的引导',
+      '有新动态时，插件图标上会出现紫色小圆点'
+    ],
+    en: [
+      'Next 7 days at a glance: see which days are packed, and click a day to see just that day',
+      'Send feedback right from the extension (💬 at the top right) — replies show up there too',
+      'A short tour the first time you open it',
+      'A purple dot on the toolbar icon when there are new updates'
+    ]
+  },
+  {
     v: '1.6.5',
     d: '2026-10-23',
     items: [

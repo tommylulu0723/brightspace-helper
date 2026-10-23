@@ -27,6 +27,7 @@
       <nav class="tabs" role="tablist" aria-label="页面">
         <button class="tab" role="tab" type="button" data-tab="overview">概览</button>
         <button class="tab" role="tab" type="button" data-tab="users">用户</button>
+        <button class="tab" role="tab" type="button" data-tab="feedback">反馈<span id="fbBadge" class="tab-badge" hidden></span></button>
         <button class="tab" role="tab" type="button" data-tab="mail">邮件提醒</button>
         <button class="tab" role="tab" type="button" data-tab="invites">邀请码</button>
         <button class="tab" role="tab" type="button" data-tab="settings">设置</button>
@@ -54,6 +55,12 @@
         <label class="search small-search"><span class="sr">搜索用户</span><input id="userQ" type="search" placeholder="搜索名字或邮箱…"></label></div>
       <div class="card table-card"><div class="table-wrap"><table class="table" id="usersTable"></table></div></div>
       <p class="hint">"Brightspace 校验"：插件登录 Brightspace 后会把那边的姓名发过来比对，一致才能用。拼法不同但确认是本人，可以点"手动通过"。管理员只能看到每个人的统计数字，看不到具体的课程内容。</p>
+    </section>
+
+    <section data-panel="feedback" hidden>
+      <div class="page-head"><div><h1>反馈</h1><p class="subtitle" id="fbSub">同学在插件里点"反馈"提交的问题和建议。</p></div>
+        <div class="seg" id="fbFilter" role="group"><button type="button" data-f="open" aria-pressed="true">待处理</button><button type="button" data-f="done" aria-pressed="false">已处理</button><button type="button" data-f="all" aria-pressed="false">全部</button></div></div>
+      <div id="fbList" class="fb-list"></div>
     </section>
 
     <section data-panel="mail" hidden>

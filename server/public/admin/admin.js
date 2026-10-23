@@ -107,6 +107,7 @@ async function load() {
     if (tab === 'users') await loadUsers();
     if (tab === 'invites') await loadInvites();
     if (tab === 'mail') await loadMail();
+    if (tab === 'feedback') await loadFeedback();
     if (tab === 'settings') await loadSettings();
     if (tab === 'audit') await loadAudit();
   } catch (e) {
@@ -117,6 +118,7 @@ async function load() {
 // ---------------- 概览 ----------------
 async function loadOverview() {
   const o = await api('GET', '/api/admin/overview');
+  setFbBadge(o.feedbackOpen || 0);
   $('ovSub').textContent = `服务器 v${o.version} · ${new Date(o.serverTime).toLocaleString('zh-CN')} 更新 · 每 15 秒自动刷新`;
   const stat = (label, n, sub, cls = '') => h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, label), h('span', { class: `stat-num ${cls}` }, n), sub ? h('span', { class: 'stat-sub' }, sub) : null);
   $('ovStats').replaceChildren(
@@ -125,6 +127,7 @@ async function loadOverview() {
     stat('24 小时内同步过', o.synced24h, `${o.sessions} 个登录设备`),
     stat('今天同步', o.today.users, `${o.today.syncs} 次同步`),
     stat('通过 Brightspace 校验', o.verified, o.unverified ? `${o.unverified} 人还没通过` : '全部通过', o.unverified ? 'warn' : ''),
+    stat('待处理反馈', o.feedbackOpen || 0, o.feedbackOpen ? '去"反馈"页看看' : '没有新反馈', o.feedbackOpen ? 'warn' : ''),
     stat('今天发出提醒邮件', o.mail.configured ? o.mail.today.sent : '未开启', o.mail.configured ? `${o.remindersOn} 人开着提醒${o.mail.today.failed ? ` · ${o.mail.today.failed} 封失败` : ''}` : '去"邮件提醒"设置发信邮箱', o.mail.today.failed || !o.mail.configured ? 'warn' : '')
   );
   const max = Math.max(1, ...o.days.map((d) => d.users));
@@ -327,8 +330,52 @@ $('runReminders').addEventListener('click', async () => {
   } catch (err) { toast(err.message); }
 });
 
+// ---------------- 反馈 ----------------
+let fbFilter = 'open';
+function setFbBadge(n) { $('fbBadge').hidden = !n; $('fbBadge').textContent = n; }
+for (const b of document.querySelectorAll('#fbFilter button')) b.addEventListener('click', () => {
+  fbFilter = b.dataset.f;
+  for (const x of document.querySelectorAll('#fbFilter button')) x.setAttribute('aria-pressed', String(x === b));
+  loadFeedback();
+});
+const KIND = { bug: ['问题', 'danger'], idea: ['建议', 'accent'], other: ['其他', 'neutral'] };
+async function loadFeedback() {
+  const { feedback, open } = await api('GET', '/api/admin/feedback');
+  setFbBadge(open);
+  const list = feedback.filter((f) => fbFilter === 'all' || f.status === fbFilter);
+  $('fbSub').textContent = `${open} 条待处理 · 共 ${feedback.length} 条`;
+  const act = async (fn, msg) => { try { await fn(); toast(msg); loadFeedback(); } catch (e) { toast(e.message); } };
+  $('fbList').replaceChildren(...(list.length ? list.map((f) => {
+    const [kl, kt] = KIND[f.kind] || KIND.other;
+    return h('div', { class: `card fb-card${f.status === 'done' ? ' done' : ''}` },
+      h('div', { class: 'fb-head' },
+        h('span', { class: `chip ${kt}` }, kl),
+        h('strong', {}, f.name || '未登录用户'),
+        h('span', { class: 'muted' }, f.email || '没留邮箱'),
+        h('span', { class: 'muted' }, `v${f.version || '?'} · ${f.lang === 'en' ? 'English' : '中文'} · ${ago(f.at)}`),
+        f.status === 'done' ? h('span', { class: 'chip ok' }, '已处理') : null),
+      h('p', { class: 'fb-msg' }, f.message),
+      f.reply ? h('p', { class: 'fb-reply' }, h('b', {}, '你的回复：'), f.reply) : null,
+      h('div', { class: 'actions' },
+        f.hasDiag ? h('button', { type: 'button', class: 'btn small', onClick: async () => {
+          try {
+            const { diagnostics } = await api('GET', `/api/admin/feedback/${f.id}`);
+            const text = JSON.stringify(diagnostics, null, 2);
+            dialog('诊断信息', h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn small', onClick: async () => { try { await navigator.clipboard.writeText(text); toast('已复制，可以直接粘贴给 Claude'); } catch { toast('复制失败'); } } }, '复制')), h('pre', { class: 'diag' }, text));
+          } catch (e) { toast(e.message); }
+        } }, '查看诊断信息') : h('span', { class: 'muted' }, '没有附诊断信息'),
+        f.userId ? h('button', { type: 'button', class: 'btn small', onClick: () => {
+          const r = prompt('回复（对方在插件的反馈窗口里能看到）：', f.reply || '');
+          if (r == null) return;
+          act(() => api('PATCH', `/api/admin/feedback/${f.id}`, { reply: r, status: 'done' }), '已回复并标记为已处理');
+        } }, f.reply ? '修改回复' : '回复') : null,
+        h('button', { type: 'button', class: 'btn small', onClick: () => act(() => api('PATCH', `/api/admin/feedback/${f.id}`, { status: f.status === 'done' ? 'open' : 'done' }), f.status === 'done' ? '已重新打开' : '已标记为已处理') }, f.status === 'done' ? '重新打开' : '标记已处理'),
+        h('button', { type: 'button', class: 'btn small', onClick: () => { if (confirm('删除这条反馈？')) act(() => api('DELETE', `/api/admin/feedback/${f.id}`), '已删除'); } }, '删除')));
+  }) : [h('div', { class: 'card empty-row' }, fbFilter === 'open' ? '没有待处理的反馈 🎉' : '还没有反馈')]));
+}
+
 // ---------------- 操作记录 ----------------
-const ACTION = { 'verify-ok': '通过 Brightspace 校验', 'verify-mismatch': '校验不一致', 'verify-taken': 'Brightspace 账号被占用', 'verify-approve': '手动通过校验', 'verify-reset': '重置校验', rename: '修改姓名', register: '注册', invite: '生成邀请码', 'delete-invite': '删除邀请码', disable: '停用账号', enable: '恢复账号', role: '修改角色', 'reset-password': '重置密码', 'logout-all': '退出所有设备', 'delete-user': '删除用户', settings: '修改设置' };
+const ACTION = { feedback: '提交反馈', 'verify-ok': '通过 Brightspace 校验', 'verify-mismatch': '校验不一致', 'verify-taken': 'Brightspace 账号被占用', 'verify-approve': '手动通过校验', 'verify-reset': '重置校验', rename: '修改姓名', register: '注册', invite: '生成邀请码', 'delete-invite': '删除邀请码', disable: '停用账号', enable: '恢复账号', role: '修改角色', 'reset-password': '重置密码', 'logout-all': '退出所有设备', 'delete-user': '删除用户', settings: '修改设置' };
 async function loadAudit() {
   const { audit } = await api('GET', '/api/admin/audit');
   const head = h('tr', {}, ...['时间', '操作', '操作人', '详情'].map((t) => h('th', {}, t)));
@@ -350,8 +397,8 @@ async function start() {
   $('login').hidden = true;
   $('app').hidden = false;
   const t = location.hash.slice(1);
-  setTab(['overview', 'users', 'mail', 'invites', 'settings', 'audit'].includes(t) ? t : 'overview');
+  setTab(['overview', 'users', 'feedback', 'mail', 'invites', 'settings', 'audit'].includes(t) ? t : 'overview');
 }
 
-setInterval(() => { if (token && !document.hidden && (tab === 'overview' || tab === 'users' || tab === 'mail')) load(); }, 15000);
+setInterval(() => { if (token && !document.hidden && (tab === 'overview' || tab === 'users' || tab === 'mail' || tab === 'feedback')) load(); }, 15000);
 start();

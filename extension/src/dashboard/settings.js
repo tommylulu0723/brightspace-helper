@@ -302,8 +302,10 @@ function renderDiag(body, ctx) {
   }
   fill(body, 
     h('div', { class: 'btn-row' },
+      h('button', { type: 'button', class: 'btn primary', onClick: () => ctx.openFeedback() }, '反馈 / 报告问题'),
       h('button', { type: 'button', class: 'btn', onClick: ctx.copyDiagnostics }, '复制诊断信息'),
-      h('span', { class: 'hint' }, '某项状态不对时，点这个再粘贴给开发者，里面有每一项的判断依据。')),
+      h('button', { type: 'button', class: 'btn', onClick: () => ctx.startTour() }, '重新看新手引导'),
+      h('span', { class: 'hint' }, '遇到问题点"反馈"，写一句话就行，诊断信息会自动附上。')),
     h('p', { class: 'muted-line' }, info.join(' · ') || '还没同步过'));
 }
 

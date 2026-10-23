@@ -200,6 +200,33 @@ async function announceUpdate() {
   });
 }
 
+// 图标左上角的紫色小圆点 = 有未读动态（右下角的数字被红色的紧急数占着时，靠它提醒有新公告）
+const iconCache = {};
+let iconDot = null;
+async function iconWithDot(size) {
+  if (iconCache[size]) return iconCache[size];
+  const res = await fetch(chrome.runtime.getURL(`icons/icon${size}.png`));
+  const bmp = await createImageBitmap(await res.blob());
+  const c = new OffscreenCanvas(size, size);
+  const g = c.getContext('2d');
+  g.drawImage(bmp, 0, 0, size, size);
+  const r = size * 0.19;
+  const x = r + size * 0.02;
+  const y = r + size * 0.02;
+  g.beginPath(); g.arc(x, y, r + size * 0.06, 0, Math.PI * 2); g.fillStyle = '#FFFFFF'; g.fill();   // 白边，深色图标上也看得清
+  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = '#A855F7'; g.fill();
+  iconCache[size] = g.getImageData(0, 0, size, size);
+  return iconCache[size];
+}
+async function setIconDot(on) {
+  if (iconDot === on) return;
+  iconDot = on;
+  try {
+    if (on) await chrome.action.setIcon({ imageData: { 16: await iconWithDot(16), 32: await iconWithDot(32) } });
+    else await chrome.action.setIcon({ path: { 16: 'icons/icon16.png', 32: 'icons/icon32.png' } });
+  } catch { iconDot = null; /* 画不出来就保持原样 */ }
+}
+
 async function setStatus(patch) {
   const { status = {} } = await chrome.storage.local.get('status');
   await chrome.storage.local.set({ status: { ...status, ...patch } });
@@ -213,6 +240,7 @@ async function refreshBadge() {
     const { cloud: c } = await chrome.storage.local.get('cloud');
     const g = gateState({ requireLogin: true, cloud: c, data });
     if (isBlocking(g.state)) {
+      await setIconDot(false);
       await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
       await chrome.action.setBadgeText({ text: '!' });
       await setTitleTr({ title: g.state === 'login' ? '课程助手：请先登录' : '课程助手：需要完成 Brightspace 姓名校验' });
@@ -230,6 +258,8 @@ async function refreshBadge() {
   const n = badgeCount(items, new Date(), overrides);
   const unread = unreadCount(data, updates, seenAt, hidden);
   // 红色数字 = 已逾期 + 48 小时内到期；没有紧急事项时，紫色数字 = 未读动态
+  // 数字被红色紧急数或绿色 NEW 占着、又有未读动态时，图标上加一个紫色小圆点
+  await setIconDot(!!unread && (!!n || !!pendingUpdate));
   if (n) {
     await chrome.action.setBadgeBackgroundColor({ color: '#B91C1C' });
     await chrome.action.setBadgeText({ text: String(n) });

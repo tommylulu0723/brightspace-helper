@@ -59,6 +59,8 @@ export const cloud = {
   updateProfile: (server, token, body) => call(server, '/api/me', { method: 'PATCH', token, body }),
   verify: (server, token, body) => call(server, '/api/me/verify', { method: 'POST', token, body }),
   testEmail: (server, token) => call(server, '/api/me/test-email', { method: 'POST', token }),
+  feedback: (server, token, body) => call(server, '/api/feedback', { method: 'POST', token, body }),
+  myFeedback: (server, token) => call(server, '/api/me/feedback', { token }),
   getState: (server, token) => call(server, '/api/state', { token }),
   putState: (server, token, body) => call(server, '/api/state', { method: 'PUT', token, body }),
   usage: (server, token, body) => call(server, '/api/usage', { method: 'POST', token, body }).catch(() => null)

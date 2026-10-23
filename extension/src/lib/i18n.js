@@ -246,6 +246,28 @@ const D = [
   ['{}（{}）· {}', '{0} ({1}) · {2}'], ['• {}', '• {}'],
   [' · {} 条新的', ' · {} new'], ['{} 条新的', '{} new'],
   ['· {}', '· {}'],
+  ['反馈 / 报告问题', 'Feedback / report a problem'], ['写一句话说说遇到了什么，开发者会在后台看到并尽快处理。', 'Tell us what happened in a sentence — the developer sees it right away.'],
+  ['遇到问题', 'Problem'], ['功能建议', 'Idea'], ['发生了什么', 'What happened'],
+  ['比如：Web Design 的 Quiz 3 我已经交了，还显示没交', 'e.g. I submitted Quiz 3 in Web Design but it still shows as not submitted'],
+  ['你的邮箱（可选，方便回复你）', 'Your email (optional, so we can reply)'], ['附上诊断信息', 'Attach diagnostics'],
+  ['· 课程名、截止事项和同步状态，不包含任何密码', '· course names, deadlines and sync status — never any passwords'],
+  ['发送', 'Send'], ['正在发送…', 'Sending…'], ['先写一句话说说遇到了什么', 'Please describe what happened'],
+  ['已发送，谢谢！处理后会在这里回复你', 'Sent — thanks! Replies show up here'], ['我之前的反馈', 'My previous feedback'],
+  ['已收到', 'Received'], ['已处理', 'Resolved'], ['回复：', 'Reply: '], ['遇到问题？反馈', 'Having trouble? Send feedback'],
+  ['遇到问题点"反馈"，写一句话就行，诊断信息会自动附上。', 'Click "Feedback" if something\'s wrong — one sentence is enough; diagnostics are attached automatically.'],
+  ['重新看新手引导', 'Replay the tour'], ['一小时最多提交 10 条反馈，稍后再试', 'You can send up to 10 messages an hour — please try later'],
+  ['写一句话说说遇到了什么问题', 'Please describe the problem'],
+  ['所有课的截止时间都在这里', 'All your deadlines live here'],
+  ['最上面是今日计划，告诉你今天先做哪几件；下面按"已逾期 / 今天 / 明天 / 7 天内"排好。', 'Today\'s plan at the top tells you what to do first; below, everything is sorted into Overdue / Today / Tomorrow / Next 7 days.'],
+  ['交了就点圆圈勾掉', 'Tick the circle when you\'re done'],
+  ['Brightspace 显示已提交的会自动打勾；查不到状态的（比如有些测验），交了之后自己点一下就行。', 'Items Brightspace shows as submitted are ticked automatically; for ones it can\'t tell (like some quizzes), tick them yourself.'],
+  ['presentation、自己的 deadline 点这里添加', 'Add presentations and your own deadlines here'],
+  ['Brightspace 上没有的事情也能加进来，会一起显示、提醒。遇到问题点右上角的 💬 反馈。', 'Things that aren\'t on Brightspace can go here too, with the same reminders. Having trouble? Click 💬 at the top right.'],
+  ['跳过', 'Skip'], ['下一步', 'Next'], ['开始使用', 'Get started'],
+  ['未来 7 天', 'Next 7 days'], ['{} 项待完成 · {}', '{0} to do · {1}'], ['接下来 7 天没有截止的事项。', 'Nothing due in the next 7 days.'],
+  ['{}比较忙，提前安排一下。', '{} looks busy — plan ahead.'], ['最多的一天是{}（{} 项）。', 'Busiest day: {0} ({1}).'],
+  ['显示全部日期', 'Show all days'], ['这天没有截止的事项', 'Nothing due this day'], ['{}/{}', '{0}/{1}'],
+  [' · 只看 {} 月 {} 日', ' · only {0}/{1}'], ['只看 {} 月 {} 日', 'only {0}/{1}'],
   ['有新版本时会自动更新，不用重新安装。', 'New versions install automatically — no reinstalling.'],
   ['测试更新', 'Test update'], ['模拟收到一个新版本，完整走一遍更新流程', 'Simulate a new version and run the full update flow'],
   ['已模拟"检测到更新"：看右下角的通知或页面顶部的绿色横幅，点"立即更新"', 'Simulated "Update available": see the notification or the green banner at the top, then click "Update now"'],
@@ -280,8 +302,11 @@ const D = [
 const exact = new Map();
 const patterns = [];
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-for (const [zh, en] of D) {
-  if (!zh.includes('{}')) { exact.set(zh, en); continue; }
+for (const [zh0, en0] of D) {
+  // 首尾空格不算（翻译时首尾空格会单独保留），这样 ' · xxx' 和 '· xxx' 都能对上
+  const zh = zh0.trim();
+  const en = en0.trim();
+  if (!zh.includes('{}')) { if (!exact.has(zh) || zh0 === zh) exact.set(zh, en); continue; }
   const parts = zh.split('{}');
   const re = new RegExp(`^${parts.map(esc).join('([\\s\\S]*?)')}$`);
   let i = 0;

@@ -17,6 +17,8 @@ import { gateState, isBlocking } from '../lib/gate.js';
 import { withCustom, upsertCustom, removeCustom, pruneCustom, MINE, CUSTOM_TYPES } from '../lib/custom.js';
 import { cloud as cloudApi } from '../lib/cloud.js';
 import { renderGate, resetGate } from './gate.js';
+import { openFeedback, buildDiagnostics } from './feedback.js';
+import { startTour } from './tour.js';
 import { REQUIRE_LOGIN } from '../config.js';
 import { loadLang, loadTheme, applyTheme, THEMES } from '../lang.js';
 import { translatePage, getLang, setLang } from '../lib/i18n.js';
@@ -67,6 +69,8 @@ function ctxFor(now) {
 
 const appCtx = () => ({
   state, store,
+  startTour: () => maybeTour(true),
+  openFeedback: () => openFeedback({ state, store, page: ui.view }),
   rerender: render,
   scheduleResync,
   copyDiagnostics,
@@ -82,11 +86,12 @@ function render() {
   document.body.classList.toggle('locked', locked);
   $('gate').hidden = !locked;
   if (locked) {
-    renderGate($('gate'), { state, store, rerender: render }, gate);
+    renderGate($('gate'), { state, store, rerender: render, openFeedback: () => openFeedback({ state, store, page: `gate:${gate.state}` }) }, gate);
     return;
   }
   resetGate();
   if (!VIEWS.includes(ui.view)) ui.view = 'deadlines';
+  maybeTour();
   const ctx = ctxFor(now);
   const ids = new Set(ctx.courses.map((c) => c.id));
   if (ui.course !== 'all' && !ids.has(ui.course)) ui.course = 'all';
@@ -253,6 +258,7 @@ function renderDeadlines(ctx) {
   const byCourse = ctx.items.filter((it) => ui.course === 'all' || it.courseId === ui.course);
   const q = ui.q.trim().toLowerCase();
   const filtered = byCourse.filter((it) => {
+    if (ui.day && dayKey(new Date(it.due)) !== ui.day) return false;
     if (ui.type !== 'all' && it.type !== ui.type) return false;
     if (ui.hideDone && isDone(it, ov)) return false;
     if (q && !`${it.title} ${names[it.courseId] || ''}`.toLowerCase().includes(q)) return false;
@@ -260,7 +266,7 @@ function renderDeadlines(ctx) {
   });
 
   const label = ui.course === 'all' ? `全部 ${ctx.courses.length} 门课` : names[ui.course];
-  $('subtitle').textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 ${WEEKDAY[now.getDay()]} · ${label}`;
+  $('subtitle').textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 ${WEEKDAY[now.getDay()]} · ${label}${ui.day ? ` · 只看 ${Number(ui.day.slice(5, 7))} 月 ${Number(ui.day.slice(8))} 日` : ''}`;
   const s = stats(byCourse, now, ov);
   $('statOpen').textContent = data ? s.open : '–';
   $('statSoon').textContent = data ? s.soon : '–';
@@ -268,6 +274,7 @@ function renderDeadlines(ctx) {
   $('statUnverified').textContent = data ? s.unverified : '–';
 
   renderPlan(byCourse, ctx);
+  renderWeek(byCourse, ctx);
 
   const types = ['all', ...Object.keys(TYPE_LABEL).filter((t) => byCourse.some((it) => it.type === t))];
   if (!types.includes(ui.type)) ui.type = 'all';
@@ -297,6 +304,59 @@ function renderDeadlines(ctx) {
       h('span', { class: 'n' }, `${g.items.length} 项`),
       HINT[g.id] ? h('span', { class: 'hint' }, `· ${HINT[g.id]}`) : null),
     h('div', { class: 'card-list' }, ...g.items.map((it) => renderRow(it, ctx))))));
+}
+
+// ---------------- 一周负担 ----------------
+const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const BIG = new Set(['exam', 'presentation']);
+
+function renderWeek(items, { now, colors, names }) {
+  const box = $('weekBox');
+  if (!state.data) { fill(box); return; }
+  const ov = state.overrides;
+  const start = new Date(now); start.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
+  const byDay = new Map(days.map((d) => [dayKey(d), []]));
+  for (const it of items) {
+    if (isDone(it, ov)) continue;
+    const t = Date.parse(it.due);
+    if (!Number.isFinite(t) || t < now.getTime()) continue;
+    const k = dayKey(new Date(t));
+    if (byDay.has(k)) byDay.get(k).push(it);
+  }
+  const counts = [...byDay.values()].map((l) => l.length);
+  const max = Math.max(1, ...counts);
+  const total = counts.reduce((a, b) => a + b, 0);
+  const busiest = days[counts.indexOf(Math.max(...counts))];
+  const heavyDays = days.filter((d) => { const l = byDay.get(dayKey(d)); return l.length >= 3 || l.some((it) => BIG.has(it.type)); });
+  if (ui.day && !byDay.has(ui.day)) ui.day = null;
+  const label = (d, i) => (i === 0 ? '今天' : i === 1 ? '明天' : WEEKDAY[d.getDay()]);
+  const hint = !total ? '接下来 7 天没有截止的事项。'
+    : heavyDays.length ? `${heavyDays.map((d) => label(d, days.indexOf(d))).join('、')}比较忙，提前安排一下。`
+    : `最多的一天是${label(busiest, days.indexOf(busiest))}（${Math.max(...counts)} 项）。`;
+  fill(box, h('section', { class: 'week' },
+    h('div', { class: 'week-head' },
+      h('strong', {}, '未来 7 天'),
+      h('span', { class: 'muted' }, `${total} 项待完成 · ${hint}`),
+      ui.day ? h('button', { type: 'button', class: 'link-btn', onClick: () => { ui.day = null; render(); } }, '显示全部日期') : null),
+    h('div', { class: 'week-days' }, ...days.map((d, i) => {
+      const k = dayKey(d);
+      const list = byDay.get(k);
+      const big = list.filter((it) => BIG.has(it.type));
+      const heavy = list.length >= 3 || big.length;
+      const tip = list.map((it) => `${it.title}（${names[it.courseId] || ''}）`).join('\n');
+      return h('button', {
+        type: 'button', class: `wday${heavy ? ' heavy' : ''}${list.length ? '' : ' empty'}${ui.day === k ? ' on' : ''}`,
+        'aria-pressed': String(ui.day === k), title: tip || '这天没有截止的事项',
+        onClick: () => { ui.day = ui.day === k ? null : k; render(); }
+      },
+        h('span', { class: 'wlabel' }, label(d, i)),
+        h('span', { class: 'wdate' }, `${d.getMonth() + 1}/${d.getDate()}`),
+        h('span', { class: 'wbar' }, h('i', { style: `height:${Math.round((list.length / max) * 100)}%` })),
+        h('span', { class: 'wcount' }, list.length ? `${list.length} 项` : '—'),
+        h('span', { class: 'wdots' }, ...list.slice(0, 6).map((it) => h('i', { style: `background:${colors[it.courseId] || '#888'}` })), list.length > 6 ? h('em', {}, `+${list.length - 6}`) : null),
+        big.length ? h('span', { class: 'wbig' }, big.some((it) => it.type === 'exam') ? '考试' : '展示') : h('span', { class: 'wbig none' }, ''));
+    }))));
 }
 
 function renderRow(it, { now, colors, names }) {
@@ -381,6 +441,20 @@ function customDialog(existing = null) {
 async function saveCustom(change) {
   const { settings = {} } = await store.get(['settings']);
   await store.setSettings({ customItems: change(settings.customItems || []) });
+}
+
+// ---------------- 新手引导 ----------------
+let tourChecked = false;
+async function maybeTour(force = false) {
+  if (!force && (tourChecked || store.demo && !new URLSearchParams(location.search).has('tour'))) return;
+  if (!force && (!state.data || !(state.data.items || []).length)) return; // 有数据了再引导，不然没东西可指
+  tourChecked = true;
+  if (!force) {
+    const { tourDoneAt } = await store.get(['tourDoneAt']);
+    if (tourDoneAt) return;
+  }
+  if (ui.view !== 'deadlines') setView('deadlines');
+  startTour(() => store.set({ tourDoneAt: Date.now() }));
 }
 
 // ---------------- 主页的外观切换（跟随系统 → 浅色 → 深色） ----------------
@@ -775,17 +849,7 @@ function exportIcs() {
 }
 
 async function copyDiagnostics() {
-  const d = state.data;
-  const names = Object.fromEntries((d?.allCourses || d?.courses || []).map((c) => [c.id, c.name]));
-  const report = {
-    version: store.version(),
-    lastSync: d?.lastSync, status: state.status, requestCount: d?.requestCount, usingFallback: d?.usingFallback,
-    warnings: d?.warnings,
-    cloud: state.cloud?.token ? { server: state.cloud.server, user: state.cloud.user?.email, flags: state.cloud.flags, error: state.cloud.error, lastCloudSync: state.cloud.lastCloudSync } : null,
-    courses: { syncing: (d?.courses || []).map((c) => c.name), hidden: state.settings?.hiddenCourseIds, added: state.settings?.addedCourseIds },
-    items: (d?.items || []).map((it) => ({ course: names[it.courseId], title: it.title, type: it.type, due: it.due, status: it.status, manual: state.overrides?.[it.id] ?? null, sources: it.sources, signals: it.signals })),
-    materials: Object.fromEntries(Object.entries(d?.materials || {}).map(([k, m]) => [names[k] || k, { files: m.files, lectures: m.lectures, modules: m.modules.length }]))
-  };
+  const report = buildDiagnostics(state, store);
   try {
     await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
     toast('诊断信息已复制，直接粘贴给我就行');
@@ -829,6 +893,7 @@ $('syncBtn').addEventListener('click', () => doSync());
 $('icsBtn').addEventListener('click', exportIcs);
 $('addBtn').addEventListener('click', () => customDialog());
 $('themeBtn').addEventListener('click', cycleTheme);
+$('fbBtn').addEventListener('click', () => openFeedback({ state, store, page: ui.view }));
 for (const b of document.querySelectorAll('#langMini [data-lang]')) b.addEventListener('click', () => switchLang(b.dataset.lang));
 $('matRefresh').addEventListener('click', () => { toast('正在重新读取所有课程的课件…'); doSync({ forceMaterials: true }); });
 $('hideDone').addEventListener('change', (e) => { ui.hideDone = e.target.checked; saveUi(); render(); });

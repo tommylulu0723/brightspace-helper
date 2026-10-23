@@ -475,6 +475,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       verified: users.filter(verified).length,
       unverified: users.filter((u) => !verified(u)).length,
       mail: { configured: smtpConfigured(mailCfg()), today: D().mailStats?.[today()] || { sent: 0, failed: 0 }, lastError: (D().mailLog || []).find((m) => !m.ok)?.error || '' },
+      feedbackOpen: (D().feedback || []).filter((f) => f.status === 'open').length,
       remindersOn: users.filter((u) => verified(u) && (u.reminders?.h24 !== false || u.reminders?.h3 !== false)).length,
       sessions: D().sessions.length,
       serverTime: new Date().toISOString()
@@ -633,6 +634,76 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
   route('POST', '/api/admin/run-reminders', async ({ req }) => {
     authenticate(req, { admin: true });
     return await runReminders();
+  });
+
+  // ---------------- 反馈 / 报告问题 ----------------
+  // 列表存在 db.json（不含诊断信息）；诊断信息比较大，单独存在 data/feedback/<id>.json
+  const FB_DIR = path.join(dataDir, 'feedback');
+  fs.mkdirSync(FB_DIR, { recursive: true });
+  const fbFile = (id) => path.join(FB_DIR, `${String(id).replace(/[^\w-]/g, '')}.json`);
+  const fbLimit = rateLimiter({ windowMs: 60 * 60 * 1000, max: 10 });
+  const FB_KINDS = ['bug', 'idea', 'other'];
+  const publicFb = (f) => ({ id: f.id, at: f.at, kind: f.kind, message: f.message, status: f.status, reply: f.reply || '', repliedAt: f.repliedAt || null, version: f.version });
+
+  route('POST', '/api/feedback', async ({ req, body }) => {
+    const a = authenticate(req, { required: false });
+    if (!fbLimit(`fb:${a?.user.id || clientIp(req)}`)) throw new HttpError(429, '一小时最多提交 10 条反馈，稍后再试');
+    const message = str(body.message, 2000);
+    if (message.length < 2) throw new HttpError(400, '写一句话说说遇到了什么问题');
+    const id = newId('fb');
+    const u = a?.user;
+    const f = {
+      id, at: new Date().toISOString(), kind: FB_KINDS.includes(body.kind) ? body.kind : 'bug', message,
+      userId: u?.id || null, name: u?.name || '', email: u?.email || str(body.contact, 120),
+      version: str(body.version, 20), lang: body.lang === 'en' ? 'en' : 'zh', page: str(body.page, 40),
+      ua: str(req.headers['user-agent'], 200), status: 'open', hasDiag: false
+    };
+    if (body.diagnostics && typeof body.diagnostics === 'object') {
+      try { fs.writeFileSync(fbFile(id), JSON.stringify(body.diagnostics)); f.hasDiag = true; } catch { /* 存不下就算了 */ }
+    }
+    (D().feedback ||= []).unshift(f);
+    if (D().feedback.length > 500) for (const old of D().feedback.splice(500)) { try { fs.unlinkSync(fbFile(old.id)); } catch { /* ignore */ } }
+    db.audit('feedback', u?.email || f.email || '匿名', message.slice(0, 60));
+    db.save();
+    return { ok: true, id };
+  }, { limit: 512 * 1024 });
+
+  route('GET', '/api/me/feedback', ({ req }) => {
+    const { user } = authenticate(req);
+    return { feedback: (D().feedback || []).filter((f) => f.userId === user.id).slice(0, 30).map(publicFb) };
+  });
+
+  route('GET', '/api/admin/feedback', ({ req }) => {
+    authenticate(req, { admin: true });
+    const list = D().feedback || [];
+    return { feedback: list.slice(0, 200), open: list.filter((f) => f.status === 'open').length };
+  });
+
+  route('GET', '/api/admin/feedback/:id', ({ req, params }) => {
+    authenticate(req, { admin: true });
+    const f = (D().feedback || []).find((x) => x.id === params.id);
+    if (!f) throw new HttpError(404, '反馈不存在');
+    let diagnostics = null;
+    try { diagnostics = JSON.parse(fs.readFileSync(fbFile(f.id), 'utf8')); } catch { /* 没有 */ }
+    return { feedback: f, diagnostics };
+  });
+
+  route('PATCH', '/api/admin/feedback/:id', ({ req, params, body }) => {
+    const { user: me } = authenticate(req, { admin: true });
+    const f = (D().feedback || []).find((x) => x.id === params.id);
+    if (!f) throw new HttpError(404, '反馈不存在');
+    if (body.status === 'open' || body.status === 'done') f.status = body.status;
+    if (body.reply != null) { f.reply = str(body.reply, 1000); f.repliedAt = new Date().toISOString(); f.repliedBy = me.email; }
+    db.save();
+    return { feedback: f };
+  });
+
+  route('DELETE', '/api/admin/feedback/:id', ({ req, params }) => {
+    authenticate(req, { admin: true });
+    D().feedback = (D().feedback || []).filter((x) => x.id !== params.id);
+    try { fs.unlinkSync(fbFile(params.id)); } catch { /* ignore */ }
+    db.save();
+    return { ok: true };
   });
 
   route('GET', '/api/admin/audit', ({ req }) => {

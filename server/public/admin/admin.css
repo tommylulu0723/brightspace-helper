@@ -102,3 +102,17 @@ legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
 .vchip small { color: var(--muted); font-size: 11.5px; max-width: 260px; }
 .stat-num.warn { color: var(--warn); font-size: 22px; }
 .table-card .card-head { padding: 14px 16px 6px; }
+
+.tab-badge { margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; display: inline-grid; place-items: center; }
+.fb-list { display: flex; flex-direction: column; gap: 10px; }
+.fb-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.fb-card.done { opacity: .7; }
+.fb-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.fb-msg { margin: 0; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; }
+.fb-reply { margin: 0; font-size: 13px; color: var(--ink-2); background: var(--sunken); padding: 8px 10px; border-radius: 8px; }
+pre.diag { max-height: 60vh; overflow: auto; font-size: 12px; background: var(--sunken); padding: 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-all; }
+#dialog { max-width: min(860px, 94vw); }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunken); }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.fb-card .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } .fb-card .actions > .muted { margin-right: 4px; font-size: 13px; }

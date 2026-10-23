@@ -25,11 +25,13 @@ function accountLine(ctx) {
   const c = ctx.state.cloud;
   return h('p', { class: 'gate-foot' },
     c?.user ? `已登录 ${c.user.email} · ` : '',
-    h('button', { type: 'button', class: 'link-btn', onClick: async () => {
+    c?.user ? h('button', { type: 'button', class: 'link-btn', onClick: async () => {
       await cloud.logout(c.server, c.token);
       await ctx.store.set({ cloud: { server: c.server, token: null, user: null } });
       lastKey = '';
-    } }, '退出登录'));
+    } }, '退出登录') : null,
+    c?.user ? ' · ' : '',
+    ctx.openFeedback ? h('button', { type: 'button', class: 'link-btn', onClick: () => ctx.openFeedback() }, '遇到问题？反馈') : null);
 }
 
 function authForm(ctx) {
@@ -105,7 +107,8 @@ function authForm(ctx) {
       h('button', { type: 'button', 'aria-pressed': String(!reg), onClick: () => { mode = 'login'; lastKey = ''; ctx.rerender(); } }, '登录'),
       h('button', { type: 'button', 'aria-pressed': String(reg), onClick: () => { mode = 'register'; lastKey = ''; if (!info) loadInfo(normalizeServer(server)).then(() => { lastKey = ''; ctx.rerender(); }); ctx.rerender(); } }, '注册')),
     form,
-    info?.announcement ? h('p', { class: 'hint' }, `📣 ${info.announcement}`) : null);
+    info?.announcement ? h('p', { class: 'hint' }, `📣 ${info.announcement}`) : null,
+    accountLine(ctx));
 }
 
 function message(ctx, { tone, title, body, actions = [] }) {

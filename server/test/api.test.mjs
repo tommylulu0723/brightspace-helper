@@ -243,6 +243,28 @@ await test('删除用户会同时删掉他的数据', async () => {
   assert.ok(!fs.existsSync(path.join(dir, 'state', `${id}.json`)));
   assert.equal((await api('GET', '/api/me', { token: alice })).status, 401);
 });
+await test('反馈：登录用户和未登录都能提交；管理员能看诊断、回复、标记已处理；用户能看到回复', async () => {
+  assert.equal((await api('POST', '/api/feedback', { body: { message: '' } })).status, 400);
+  const anon = await api('POST', '/api/feedback', { body: { message: '登录页打不开', contact: 'x@nyu.edu', version: '1.6.5' } });
+  assert.equal(anon.status, 200);
+  const mine = await api('POST', '/api/feedback', { token: admin, body: { message: '截止时间显示不对', kind: 'bug', version: '1.6.5', diagnostics: { items: [{ title: 'HW' }] } } });
+  assert.equal(mine.status, 200);
+  const list = (await api('GET', '/api/admin/feedback', { token: admin })).data;
+  assert.equal(list.open, 2);
+  const f = list.feedback.find((x) => x.id === mine.data.id);
+  assert.equal(f.email, 'tommy@nyu.edu');
+  assert.ok(f.hasDiag && !('diagnostics' in f), '列表里不带诊断信息');
+  const detail = (await api('GET', `/api/admin/feedback/${f.id}`, { token: admin })).data;
+  assert.equal(detail.diagnostics.items[0].title, 'HW');
+  await api('PATCH', `/api/admin/feedback/${f.id}`, { token: admin, body: { status: 'done', reply: '已修复，更新到最新版' } });
+  const back = (await api('GET', '/api/me/feedback', { token: admin })).data.feedback[0];
+  assert.equal(back.status, 'done');
+  assert.equal(back.reply, '已修复，更新到最新版');
+  assert.equal((await api('GET', '/api/admin/overview', { token: admin })).data.feedbackOpen, 1);
+  assert.ok([401, 403].includes((await api('GET', '/api/admin/feedback', { token: alice })).status), '普通用户看不到别人的反馈');
+  await api('DELETE', `/api/admin/feedback/${anon.data.id}`, { token: admin });
+  assert.equal((await api('GET', '/api/admin/feedback', { token: admin })).data.feedback.length, 1);
+});
 await test('CORS：插件来源允许，陌生网站不允许', async () => {
   const ok = await api('GET', '/api/info', { origin: 'chrome-extension://abcdefghijklmnop' });
   assert.equal(ok.headers.get('access-control-allow-origin'), 'chrome-extension://abcdefghijklmnop');

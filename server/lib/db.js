@@ -17,7 +17,8 @@ const DEFAULT_DB = () => ({
     mail: {}                          // 发信邮箱：{ host, port, secure, user, pass, from, fromName }
   },
   mailStats: {},                      // 'YYYY-MM-DD' -> { sent, failed }，保留 30 天
-  mailLog: [],                        // 最近 200 封邮件的发送记录
+  mailLog: [],
+  feedback: [],                       // 用户反馈（诊断信息单独存在 feedback/ 文件夹）                        // 最近 200 封邮件的发送记录
   activity: {},                       // 'YYYY-MM-DD' -> { syncs, users: [userId] }，保留 60 天
   audit: []
 });
