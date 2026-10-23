@@ -20,6 +20,7 @@ export function createStore() {
       reload: () => chrome.runtime.sendMessage({ type: 'reload' }),
       checkUpdate: () => chrome.runtime.sendMessage({ type: 'checkUpdate' }),
       verify: () => chrome.runtime.sendMessage({ type: 'verify' }),
+      maybeSync: () => chrome.runtime.sendMessage({ type: 'maybeSync' }),
       applyUpdate: () => chrome.runtime.sendMessage({ type: 'applyUpdate' })
     };
   }
@@ -52,6 +53,7 @@ export function createStore() {
     reload: async () => location.reload(),
     checkUpdate: async () => ({ pending: null }),
     verify: async () => ({ ok: true }),
+    maybeSync: async () => ({ ok: true }),
     applyUpdate: async () => location.reload()
   };
 }

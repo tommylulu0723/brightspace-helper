@@ -279,7 +279,17 @@ function renderNotify(body, ctx) {
     row('notifyPlan', '每天早上的今日计划', '8 点以后第一次同步时，告诉你今天先做哪几件'),
     row('notify', '快到期提醒', '24 小时内到期的事项各提醒一次；Brightspace 登录过期时提醒重新登录'),
     row('notifyUpdates', '动态提醒', '新公告、新课件、课件更新、截止时间改动、新作业、出分'),
-    row('autoApplyUpdate', '自动安装插件更新', '关闭时：检测到新版本先弹窗问你，点"立即更新"才更新', false));
+    row('autoApplyUpdate', '自动安装插件更新', '关闭时：检测到新版本先弹窗问你，点"立即更新"才更新', false),
+    syncEveryRow(s, ctx));
+}
+
+function syncEveryRow(s, ctx) {
+  const cur = [5, 10, 30].includes(s.syncEvery) ? s.syncEvery : 10;
+  const sel = h('select', { class: 'mini-select', 'aria-label': '自动同步间隔' }, ...[5, 10, 30].map((m) => h('option', { value: m, selected: m === cur }, `每 ${m} 分钟`)));
+  sel.addEventListener('change', () => ctx.store.set({ settings: { ...(ctx.state.settings || {}), syncEvery: Number(sel.value) }, settingsAt: Date.now() }));
+  return h('div', { class: 'check-row sync-every' },
+    h('span', {}, h('b', {}, '自动同步'), h('span', { class: 'muted' }, ' · 另外打开插件、在 Brightspace 交完作业、电脑从休眠回来时也会马上同步')),
+    sel);
 }
 
 function renderDiag(body, ctx) {
@@ -337,7 +347,7 @@ export function renderSettingsView(root, ctx) {
   section(root, 'courses', '课程管理');
   once('lang', [getLang()], () => renderLang(section(root, 'lang', '语言 / Language'), ctx));
   section(root, 'lang', '语言 / Language');
-  once('notify', [st.settings?.notify, st.settings?.notifyPlan, st.settings?.notifyUpdates, st.settings?.autoApplyUpdate], () => renderNotify(section(root, 'notify', '通知'), ctx));
+  once('notify', [st.settings?.notify, st.settings?.notifyPlan, st.settings?.notifyUpdates, st.settings?.autoApplyUpdate, st.settings?.syncEvery], () => renderNotify(section(root, 'notify', '通知'), ctx));
   section(root, 'notify', '通知');
   once('account', [st.cloud?.token, st.cloud?.user, st.cloud?.error, st.cloud?.lastCloudSync, authMode], () =>
     renderAccount(section(root, 'account', (REQUIRE_LOGIN ? '账号与邮件提醒' : '账号与云同步（可选）'), null), ctx));

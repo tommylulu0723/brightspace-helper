@@ -14,7 +14,13 @@ import { loadLang } from './lang.js';
 import { parseFirstNotes } from './lib/selfupdate.js';
 
 const ALARM = 'sync';
-const PERIOD_MIN = 30;
+const SOON_ALARM = 'sync-soon';
+export const SYNC_CHOICES = [5, 10, 30]; // 设置里可选的自动同步间隔（分钟）
+const DEFAULT_EVERY = 10;
+async function syncEvery() {
+  const { settings = {} } = await chrome.storage.local.get('settings');
+  return SYNC_CHOICES.includes(settings.syncEvery) ? settings.syncEvery : DEFAULT_EVERY;
+}
 const DASHBOARD = 'src/dashboard/dashboard.html';
 
 // 备用请求方式：后台请求带不上登录态时，借一个已打开的 Brightspace 标签页去请求
@@ -52,9 +58,10 @@ async function setTitleTr(o) {
 }
 
 async function ensureAlarm() {
+  const every = await syncEvery();
   const a = await chrome.alarms.get(ALARM);
-  if (!a || a.periodInMinutes !== PERIOD_MIN) {
-    await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: PERIOD_MIN });
+  if (!a || a.periodInMinutes !== every) {
+    await chrome.alarms.create(ALARM, { delayInMinutes: Math.min(1, every), periodInMinutes: every });
   }
   // Chrome 允许的最短间隔是 30 秒；每次闹钟查两次（隔 15 秒），新版本拉下来后十几秒内就会弹"检测到更新"
   const u = await chrome.alarms.get(UPDATE_ALARM);
@@ -459,6 +466,7 @@ chrome.runtime.onStartup.addListener(async () => {
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === UPDATE_ALARM) { checkSelfUpdate(); setTimeout(checkSelfUpdate, 15000); }
   if (a.name === ALARM) syncNow('alarm');
+  if (a.name === SOON_ALARM) maybeSync('after-submit', 20 * 1000);
 });
 
 chrome.notifications.onButtonClicked.addListener((id, idx) => {
@@ -478,15 +486,34 @@ chrome.notifications.onClicked.addListener((id) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && (changes.overridesAt || changes.settingsAt)) scheduleCloudPush();
   if (area === 'local' && (changes.seenAt || changes.settings)) refreshBadge();
+  if (area === 'local' && changes.settings && changes.settings.newValue?.syncEvery !== changes.settings.oldValue?.syncEvery) ensureAlarm();
   if (area === 'local' && (changes.overrides || changes.pendingUpdate || changes.cloud)) refreshBadge();
 });
 
 // 刚登录完 Brightspace 时，如果之前是"登录过期"状态，马上补一次同步
+// ---------------- 随时同步 ----------------
+// 除了定时同步，下面这些时候也会自动补一次（离上次同步太近就跳过，免得给 Brightspace 添负担）
+async function maybeSync(reason, minAgeMs) {
+  if (running) return running;
+  const { data, status = {} } = await chrome.storage.local.get(['data', 'status']);
+  const last = Math.max(Date.parse(data?.lastSync || 0) || 0, Date.parse(status.lastAttempt || 0) || 0);
+  if (Date.now() - last < minAgeMs) return { ok: true, skipped: true };
+  return syncNow(reason);
+}
+
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (info.status !== 'complete' || !tab.url || !tab.url.startsWith(`${BASE_URL}/d2l/`)) return;
   if (/\/d2l\/login/.test(tab.url)) return;
   const { status = {} } = await chrome.storage.local.get('status');
-  if (status.state === 'error' && status.error?.code === 'AUTH_REQUIRED') syncNow('login');
+  if (status.state === 'error' && status.error?.code === 'AUTH_REQUIRED') { syncNow('login'); return; }
+  // 在 Brightspace 上交作业、做测验、发讨论之后：半分钟后同步，状态马上变成"已提交"
+  if (/\/(dropbox|quizzing|discussions)\//i.test(tab.url)) { chrome.alarms.create(SOON_ALARM, { delayInMinutes: 0.5 }); return; }
+  maybeSync('brightspace', 5 * 60 * 1000); // 在逛 Brightspace：超过 5 分钟没同步就补一次
+});
+
+// 电脑从休眠 / 锁屏回来
+chrome.idle?.onStateChanged.addListener((state) => {
+  if (state === 'active') maybeSync('wake', 3 * 60 * 1000);
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -498,6 +525,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendResponse({ ok: true });
     setTimeout(() => chrome.runtime.reload(), 200);
     return false;
+  }
+  if (msg && msg.type === 'maybeSync') {
+    // 打开插件弹窗 / 汇总页：超过 2 分钟没同步就马上同步一次
+    maybeSync('open', 2 * 60 * 1000).then(sendResponse);
+    return true;
   }
   if (msg && msg.type === 'verify') {
     // 还没读到 Brightspace 姓名就先同步一次（同步完会自动核对），读到了就直接核对

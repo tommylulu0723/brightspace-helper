@@ -7,6 +7,18 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.6.0',
+    d: '2026-10-23',
+    items: [
+      '随时同步：后台默认每 10 分钟同步一次（设置 → 通知 里可选 5 / 10 / 30 分钟）',
+      '打开插件、切回汇总页、在 Brightspace 交完作业 / 做完测验、电脑从休眠回来时都会马上同步；交完作业半分钟左右就显示"已提交"'
+    ],
+    en: [
+      'Always up to date: background sync every 10 minutes by default (choose 5 / 10 / 30 in Settings → Notifications)',
+      'Also syncs right away when you open the extension, return to the dashboard, submit an assignment or quiz on Brightspace, or wake your computer — submissions show as "Submitted" within about half a minute'
+    ]
+  },
+  {
     v: '1.5.3',
     d: '2026-10-22',
     items: ['修复：移除课程等确认框里，红色按钮上的字看不见'],

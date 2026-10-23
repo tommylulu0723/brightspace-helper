@@ -479,3 +479,4 @@ body.locked .lang-mini { display: inline-flex !important; margin-left: auto; }
 @media (min-width: 761px) { .search { flex: 1 1 120px; min-width: 120px; } .sync-text { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
 .dialog:has(.custom-form) { max-width: 520px; }
 .custom-form { min-width: 0; }
+.sync-every { justify-content: space-between; gap: 12px; } .mini-select { min-height: 32px; border: 1px solid var(--border); border-radius: 8px; padding: 0 8px; background: var(--surface); color: inherit; font: inherit; }

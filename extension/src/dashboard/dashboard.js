@@ -826,5 +826,8 @@ store.onChanged((ch) => {
   load();
 });
 store.checkUpdate?.();
+store.maybeSync?.();
+// 页面一直开着时：切回这个标签页也补一次
+document.addEventListener('visibilitychange', () => { if (!document.hidden) store.maybeSync?.(); });
 setInterval(() => { if (ui.view !== 'settings') render(); }, 60 * 1000);
 load();

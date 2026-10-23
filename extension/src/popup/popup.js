@@ -146,3 +146,4 @@ translatePage(document.body);
 store.onChanged(render);
 render();
 store.checkUpdate?.();
+store.maybeSync?.();
