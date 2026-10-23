@@ -1,7 +1,7 @@
 ﻿# 课程助手 · Windows 图形安装向导 / Course Helper · Windows installer
 # 四页：选择语言 → 选择安装位置 → 安装进度 → 完成（打开 Chrome 里的安装引导页）
 # 实际安装由 windows-setup.ps1 完成（同一个文件夹里有就用本地的，没有就从 GitHub 下载最新的）
-param([string]$SetupScript = '')
+param([string]$SetupScript = '', [string]$UninstallScript = '')
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -24,8 +24,15 @@ $FontTitle = New-Object System.Drawing.Font('Microsoft YaHei UI', 15, [System.Dr
 $FontBig = New-Object System.Drawing.Font('Microsoft YaHei UI', 12, [System.Drawing.FontStyle]::Bold)
 
 # 默认语言跟随系统
-$script:Lang = if ((Get-Culture).Name -like 'zh*') { 'zh' } else { 'en' }
-function L($zh, $en) { if ($script:Lang -eq 'en') { $en } else { $zh } }
+# 所有会在按钮事件里改动的状态都放在这个表里：事件处理里改 $script: 变量在个别电脑上不生效（选了 English 界面不变）
+$State = @{ Lang = $(if ((Get-Culture).Name -like 'zh*') { 'zh' } else { 'en' }); Proc = $null; OutFile = (Join-Path $env:TEMP 'course-helper-install.log') }
+function L($zh, $en) { if ($State.Lang -eq 'en') { $en } else { $zh } }
+# 按钮出错时弹窗显示原因，并写到临时文件夹里的日志（不会再"点了没反应"）
+function Show-Err($e) {
+  $msg = "$($e.Exception.Message)`n$($e.InvocationInfo.PositionMessage)"
+  try { Add-Content -Path (Join-Path $env:TEMP 'course-helper-installer-error.log') -Value "$(Get-Date -Format s) $msg" } catch { }
+  [System.Windows.Forms.MessageBox]::Show("出错了 / Something went wrong:`n`n$msg", 'Course Helper') | Out-Null
+}
 
 # ---------- 默认安装位置：已经装过就用原来的；否则第一个非系统盘 ----------
 function Find-Existing {
@@ -85,8 +92,8 @@ function New-Button($parent, $text, $x, $y, $w = 100, $primary = $false, $h = 32
 $p0 = New-Page
 New-Label $p0 "请选择语言`nPlease choose your language" 28 26 544 0 $FontBig | Out-Null
 New-Label $p0 "安装程序和课程助手都会使用这个语言，以后可以在课程助手的设置里切换。`nThe installer and Course Helper will use this language. You can change it later in Settings." 28 96 544 0 $Font $Muted | Out-Null
-$zhBtn = New-Button $p0 '中文' 28 200 266 ($script:Lang -eq 'zh') 64
-$enBtn = New-Button $p0 'English' 306 200 266 ($script:Lang -eq 'en') 64
+$zhBtn = New-Button $p0 '中文' 28 200 266 ($State.Lang -eq 'zh') 64
+$enBtn = New-Button $p0 'English' 306 200 266 ($State.Lang -eq 'en') 64
 $zhBtn.Font = $FontBig; $enBtn.Font = $FontBig
 
 # ---------- 第 1 页：选择安装位置 ----------
@@ -103,6 +110,8 @@ $box.Location = (P 24 186); $box.Size = (Z 552 120)
 $boxText = New-Label $box '' 14 26 520 0
 $p1.Controls.Add($box)
 $back1 = New-Button $p1 '' 24 330 100
+$uninst = New-Button $p1 '' 134 330 110
+$uninst.Visible = [bool]$Existing
 $cancel1 = New-Button $p1 '' 364 330 100
 $install = New-Button $p1 '' 476 330 100 $true
 
@@ -144,6 +153,7 @@ function Apply-Lang {
   $box.Text = L '安装程序会自动完成' 'The installer will'
   $boxText.Text = L "✓ 下载最新版的课程助手`n✓ 设置热更新：有新版本时插件里弹出`"检测到更新`"`n✓ 没有 Git 的话自动安装（可能弹出一次确认窗口）" "✓ Download the latest Course Helper`n✓ Set up hot updates: you'll see `"Update available`" in the extension`n✓ Install Git if needed (you may see one confirmation prompt)"
   $back1.Text = L '上一步' 'Back'
+  $uninst.Text = L '卸载…' 'Uninstall…'
   $cancel1.Text = L '取消' 'Cancel'
   $install.Text = L '安装' 'Install'
   $p2Title.Text = L '正在安装…' 'Installing…'
@@ -171,9 +181,24 @@ $pathBox.Add_TextChanged({ Update-Space })
 
 function Show-Page($p) { foreach ($x in @($p0, $p1, $p2, $p3)) { $x.Visible = ($x -eq $p) } }
 
-$zhBtn.Add_Click({ $script:Lang = 'zh'; Apply-Lang; Show-Page $p1 })
-$enBtn.Add_Click({ $script:Lang = 'en'; Apply-Lang; Show-Page $p1 })
+$zhBtn.Add_Click({ try { $State.Lang = 'zh'; Apply-Lang; Show-Page $p1 } catch { Show-Err $_ } })
+$enBtn.Add_Click({ try { $State.Lang = 'en'; Apply-Lang; Show-Page $p1 } catch { Show-Err $_ } })
 $back1.Add_Click({ Show-Page $p0 })
+$uninst.Add_Click({
+  try {
+    if ([System.Windows.Forms.MessageBox]::Show((L "卸载课程助手？`n会关闭自动更新，并询问是否删除 $Existing 。`nChrome 里的插件需要你自己在 chrome://extensions 点「移除」。" "Uninstall Course Helper?`nThis removes auto-update and asks whether to delete $Existing.`nRemove the extension yourself on chrome://extensions."), 'Course Helper', 'YesNo') -ne 'Yes') { return }
+    $u = $UninstallScript
+    if (-not ($u -and (Test-Path $u))) {
+      [Net.ServicePointManager]::SecurityProtocol = 'Tls12'
+      $r = Invoke-RestMethod "https://api.github.com/repos/$Repo/contents/deploy/windows-uninstall.ps1?ref=main&t=$([DateTime]::Now.Ticks)" -Headers @{ 'User-Agent' = 'course-helper' }
+      $u = Join-Path $env:TEMP 'course-helper-uninstall.ps1'
+      [IO.File]::WriteAllBytes($u, [Convert]::FromBase64String($r.content))
+    }
+    # 卸载需要问"删不删文件夹"，所以在一个看得见的窗口里运行
+    Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$u`"")
+    $form.Close()
+  } catch { Show-Err $_ }
+})
 $cancel1.Add_Click({ $form.Close() })
 $close2.Add_Click({ $form.Close() })
 $done.Add_Click({ $form.Close() })
@@ -195,7 +220,7 @@ function Find-Chrome {
 }
 # Chrome 不允许别的程序直接打开 chrome://extensions（只会打开首页），所以打开我们的安装引导网页
 $openGuide.Add_Click({
-  $url = "$Site/install/?lang=$($script:Lang)&os=win&path=$([uri]::EscapeDataString($extLbl.Text))"
+  $url = "$Site/install/?lang=$($State.Lang)&os=win&path=$([uri]::EscapeDataString($extLbl.Text))"
   $c = Find-Chrome
   if ($c) { Start-Process $c $url } else {
     [System.Windows.Forms.MessageBox]::Show((L '没找到 Google Chrome，先安装 Chrome 再按引导操作。' 'Google Chrome wasn''t found. Install Chrome first, then follow the guide.'), 'Course Helper') | Out-Null
@@ -219,14 +244,12 @@ function Get-SetupScript {
 }
 
 # ---------- 安装 ----------
-$script:proc = $null
-$script:outFile = Join-Path $env:TEMP 'course-helper-install.log'
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 400
 
 function Read-Log {
   try {
-    $fs = [IO.File]::Open($script:outFile, 'Open', 'Read', 'ReadWrite')
+    $fs = [IO.File]::Open($State.OutFile, 'Open', 'Read', 'ReadWrite')
     $sr = New-Object IO.StreamReader($fs, [Text.Encoding]::UTF8)
     $t = $sr.ReadToEnd(); $sr.Close()
     $t = ($t -replace "`r", '') -replace "`n", "`r`n"
@@ -236,12 +259,12 @@ function Read-Log {
 
 $timer.Add_Tick({
   Read-Log
-  if ($script:proc -and $script:proc.HasExited) {
+  if ($State.Proc -and $State.Proc.HasExited) {
     $timer.Stop()
     Read-Log
     $bar.Style = 'Continuous'; $bar.Value = 100
     $dir = $pathBox.Text.TrimEnd('\')
-    if ($script:proc.ExitCode -eq 0 -and (Test-Path (Join-Path $dir 'extension\manifest.json'))) {
+    if ($State.Proc.ExitCode -eq 0 -and (Test-Path (Join-Path $dir 'extension\manifest.json'))) {
       $ext = Join-Path $dir 'extension'
       $extLbl.Text = $ext
       try { [System.Windows.Forms.Clipboard]::SetText($ext) } catch { }
@@ -258,6 +281,7 @@ $timer.Add_Tick({
 $back2.Add_Click({ $back2.Visible = $false; Apply-Lang; $p2Title.ForeColor = 'Black'; $bar.Style = 'Marquee'; Show-Page $p1 })
 
 $install.Add_Click({
+ try {
   $dir = $pathBox.Text.Trim().TrimEnd('\')
   if (-not $dir -or -not [System.IO.Path]::IsPathRooted($dir)) { [System.Windows.Forms.MessageBox]::Show((L '请选择一个完整的安装位置，例如 D:\CourseHelper' 'Please choose a full path, e.g. D:\CourseHelper'), 'Course Helper') | Out-Null; return }
   if ($dir -match '[^\x00-\x7F]') {
@@ -273,18 +297,19 @@ $install.Add_Click({
     $log.AppendText((L "下载安装脚本失败：$($_.Exception.Message)`r`n请检查网络后重试。" "Couldn't download the setup script: $($_.Exception.Message)`r`nCheck your network and try again."))
     $back2.Visible = $true; $close2.Enabled = $true; $bar.Style = 'Continuous'; return
   }
-  Remove-Item $script:outFile -ErrorAction SilentlyContinue
+  Remove-Item $State.OutFile -ErrorAction SilentlyContinue
   $q = { param($x) "'" + ($x -replace "'", "''") + "'" }
-  $o = & $q $script:outFile
-  $cmd = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; try { & $(& $q $setup) -Dir $(& $q $dir) -Lang $($script:Lang) -NoChrome *>&1 | Out-File -FilePath $o -Encoding utf8 -Append; exit 0 } catch { ('✗ ' + `$_.Exception.Message) | Out-File -FilePath $o -Encoding utf8 -Append; exit 1 }"
+  $o = & $q $State.OutFile
+  $cmd = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; try { & $(& $q $setup) -Dir $(& $q $dir) -Lang $($State.Lang) -NoChrome *>&1 | Out-File -FilePath $o -Encoding utf8 -Append; exit 0 } catch { ('✗ ' + `$_.Exception.Message) | Out-File -FilePath $o -Encoding utf8 -Append; exit 1 }"
   $psi = New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName = 'powershell.exe'
   $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"$($cmd -replace '"', '\"')`""
   $psi.WindowStyle = 'Hidden'
   $psi.CreateNoWindow = $true
   $psi.UseShellExecute = $false
-  $script:proc = [System.Diagnostics.Process]::Start($psi)
+  $State.Proc = [System.Diagnostics.Process]::Start($psi)
   $timer.Start()
+ } catch { Show-Err $_ }
 })
 
 Apply-Lang

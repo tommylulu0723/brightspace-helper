@@ -7,6 +7,12 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.5.3',
+    d: '2026-10-22',
+    items: ['修复：移除课程等确认框里，红色按钮上的字看不见'],
+    en: ['Fixed: the text on red confirm buttons (e.g. Remove course) was invisible']
+  },
+  {
     v: '1.5.2',
     d: '2026-10-22',
     items: ['还没登录或没通过姓名核对时，有新版本直接自动更新（之前被登录页挡住看不到更新提示）'],

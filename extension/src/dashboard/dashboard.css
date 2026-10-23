@@ -475,7 +475,7 @@ body.locked .lang-mini { display: inline-flex !important; margin-left: auto; }
 .custom-form select, .custom-form input, .custom-form textarea { width: 100%; box-sizing: border-box; }
 .custom-form .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .custom-form .dialog-actions .left { margin-right: auto; }
-.btn.danger { color: var(--danger); }
+.custom-form .btn.danger.left { background: transparent; border-color: var(--border); color: var(--danger); }
 @media (min-width: 761px) { .search { flex: 1 1 120px; min-width: 120px; } .sync-text { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
 .dialog:has(.custom-form) { max-width: 520px; }
 .custom-form { min-width: 0; }

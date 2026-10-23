@@ -1,6 +1,8 @@
 ﻿课程助手 · 安装说明（装一次，以后自动热更新）
 
-Windows：双击「Windows-一键安装课程助手.bat」，会打开安装窗口（第一步选中文 / English）：
+Windows：双击「CourseHelperSetup.exe」，会打开安装窗口（第一步选中文 / English）：
+  （也可以从网站下载：https://ddl.tommyxiaoshu.cn/download/CourseHelperSetup.exe；
+    打不开时可以用备用的「Windows-一键安装课程助手.bat」）
   1. 选择安装位置（默认 D 盘等非系统盘的 CourseHelper，可以点"浏览…"换）
   2. 点"安装"，等进度条走完（第一次会顺便装 Git，可能弹一次确认框，点"是"）
   3. 完成页点"打开安装引导"，Chrome 里会打开一个网页，按上面的 3 步加载插件
@@ -20,7 +22,7 @@ Mac：双击「Mac-一键安装课程助手.command」，先选语言，再确�
 手机 / iPad：用浏览器打开插件「设置 → 账号」里的"打开手机版"，登录同一个账号，
 再"添加到主屏幕"，用起来像 App。
 
-卸载：双击「Windows-卸载课程助手.bat」或「Mac-卸载课程助手.command」，再在 Chrome 扩展程序页面点「移除」。
+卸载：再打开一次 CourseHelperSetup.exe，在第二页点「卸载…」（或者双击「Windows-卸载课程助手.bat」）或「Mac-卸载课程助手.command」，再在 Chrome 扩展程序页面点「移除」。
 
 以后有新版本，插件会弹出「检测到更新」，点「立即更新」即可，不用重装。
 只支持 NYU Brightspace。
@@ -29,7 +31,8 @@ Mac：双击「Mac-一键安装课程助手.command」，先选语言，再确�
 
 Course Helper · install (once — updates are automatic afterwards)
 
-Windows: double-click "Windows-一键安装课程助手.bat". Choose English on the first screen,
+Windows: double-click "CourseHelperSetup.exe" (or download it from https://ddl.tommyxiaoshu.cn/download/CourseHelperSetup.exe).
+  Choose English on the first screen,
   pick an install location (default: CourseHelper on a non-system drive such as D:), click Install.
   If Windows shows "Windows protected your PC", click "More info" → "Run anyway".
 Mac: double-click "Mac-一键安装课程助手.command" and choose English.
@@ -45,5 +48,5 @@ your email receives deadline reminders. Log in to Brightspace and your name is c
 You can switch the language anytime in Settings → Language.
 
 Phone / iPad: open https://ddl.tommyxiaoshu.cn on your phone, log in, and "Add to Home Screen".
-Uninstall: double-click "Windows-卸载课程助手.bat" or "Mac-卸载课程助手.command", then remove it on chrome://extensions.
+Uninstall: open CourseHelperSetup.exe again and click "Uninstall…" on the second page (or double-click "Windows-卸载课程助手.bat") or "Mac-卸载课程助手.command", then remove it on chrome://extensions.
 NYU Brightspace only.
