@@ -29,6 +29,7 @@ export function createStore() {
       checkUpdate: () => chrome.runtime.sendMessage({ type: 'checkUpdate' }),
       verify: () => chrome.runtime.sendMessage({ type: 'verify' }),
       maybeSync: () => chrome.runtime.sendMessage({ type: 'maybeSync' }),
+      testUpdate: () => chrome.runtime.sendMessage({ type: 'testUpdate' }),
       applyUpdate: () => chrome.runtime.sendMessage({ type: 'applyUpdate' })
     };
   }

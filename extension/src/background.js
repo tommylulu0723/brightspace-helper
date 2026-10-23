@@ -92,7 +92,7 @@ async function checkSelfUpdate() {
   }
   const { pendingUpdate, settings = {} } = await chrome.storage.local.get(['pendingUpdate', 'settings']);
   if (!disk?.version || disk.version === running) {
-    if (pendingUpdate) await chrome.storage.local.remove('pendingUpdate');
+    if (pendingUpdate && !pendingUpdate.test) await chrome.storage.local.remove('pendingUpdate'); // 测试用的假更新留着，等你点
     return null;
   }
   if (pendingUpdate?.to === disk.version) return pendingUpdate;
@@ -146,7 +146,7 @@ async function applyUpdate() {
   const running = chrome.runtime.getManifest().version;
   const tabs = await openExtensionTabs();
   await chrome.storage.local.set({
-    justUpdated: { from: running, to: pendingUpdate?.to || '', at: new Date().toISOString() },
+    justUpdated: { from: running, to: pendingUpdate?.to || '', at: new Date().toISOString(), test: !!pendingUpdate?.test },
     reopenTabs: { at: Date.now(), tabs }
   });
   await chrome.storage.local.remove('pendingUpdate');
@@ -159,6 +159,7 @@ async function restoreTabs() {
   await chrome.storage.local.remove('reopenTabs');
   if (Date.now() - reopenTabs.at > 2 * 60 * 1000) return; // 太久以前的不管
   const list = [...(reopenTabs.tabs || [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  await chrome.storage.local.set({ reopened: list.length });
   for (const t of list) {
     if (!t.url || !t.url.startsWith(chrome.runtime.getURL(''))) continue;
     try {
@@ -176,6 +177,17 @@ async function announceUpdate() {
   await chrome.storage.local.remove('justUpdated');
   const v = chrome.runtime.getManifest().version;
   if (justUpdated.to && justUpdated.to !== v) return;
+  if (justUpdated.test) {
+    const { reopened = 0 } = await chrome.storage.local.get('reopened');
+    await chrome.storage.local.remove('reopened');
+    notify(`updated:${v}`, {
+      type: 'basic', iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: '✓ 测试成功：更新流程正常',
+      message: reopened ? `插件已重新加载，${reopened} 个页面已在原位置重新打开。真正有新版本时就是这样。` : '插件已重新加载。真正有新版本时就是这样（当时没开着插件页面，所以没有需要恢复的页面）。',
+      priority: 1
+    });
+    return;
+  }
   let note = '';
   const n = VERSION_NOTES.find((x) => x.v === v);
   if (n) note = ((await loadLang()) === 'en' && n.en ? n.en : n.items).slice(0, 2).map((x) => `• ${x}`).join('\n');
@@ -586,6 +598,26 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const v = await verifyIdentity();
       sendResponse({ ok: !!v, verify: v });
     });
+    return true;
+  }
+  if (msg && msg.type === 'testUpdate') {
+    // 测试按钮：假装检测到一个新版本，后面完全走真实的更新流程（版本号不变）
+    (async () => {
+      const v = chrome.runtime.getManifest().version;
+      const en = (await loadLang()) === 'en';
+      const notes = ['这是一次测试更新：点"立即更新"后插件会重新加载', '开着的课程助手页面会在原位置自动重新打开'];
+      const notesEn = ['This is a test update: click "Update now" and the extension reloads', 'Open Course Helper pages reopen in the same place automatically'];
+      await chrome.storage.local.set({ pendingUpdate: { from: v, to: v, notes, notesEn, test: true, at: new Date().toISOString() } });
+      refreshBadge();
+      notify(`pending:${v}`, {
+        type: 'basic', iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+        title: `检测到更新：课程助手 ${v}（测试）`,
+        message: (en ? notesEn : notes).map((x) => `• ${x}`).join('\n'),
+        buttons: [{ title: '立即更新' }, { title: '稍后' }],
+        requireInteraction: true, priority: 1
+      });
+      sendResponse({ ok: true });
+    })();
     return true;
   }
   if (msg && msg.type === 'checkUpdate') {

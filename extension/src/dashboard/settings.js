@@ -311,7 +311,12 @@ function renderChangelog(body, ctx) {
   fill(body,
     h('div', { class: 'btn-row' },
       h('span', { class: 'hint' }, `当前版本 ${ctx.store.version()}`),
-      h('button', { type: 'button', class: 'btn small', title: '检测到更新后没反应时点这里', onClick: () => ctx.store.reload() }, icon(I.refresh, 14), '重新加载插件')),
+      h('button', { type: 'button', class: 'btn small', title: '检测到更新后没反应时点这里', onClick: () => ctx.store.reload() }, icon(I.refresh, 14), '重新加载插件'),
+      ctx.store.testUpdate ? h('button', { type: 'button', class: 'btn small', title: '模拟收到一个新版本，完整走一遍更新流程', onClick: async () => {
+        await ctx.store.testUpdate();
+        toast('已模拟"检测到更新"：看右下角的通知或页面顶部的绿色横幅，点"立即更新"');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } }, '测试更新') : null),
     h('p', { class: 'hint' }, '热更新：电脑每分钟从 GitHub 拉取新版本，插件发现后弹出"检测到更新"，点"立即更新"几秒钟就好，不用重新装。'),
     ...VERSION_NOTES.filter((n) => getLang() !== 'en' || n.en).map((n) => {
       const en = getLang() === 'en' && n.en;
