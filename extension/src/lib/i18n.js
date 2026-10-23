@@ -246,6 +246,7 @@ const D = [
   ['{}（{}）· {}', '{0} ({1}) · {2}'], ['• {}', '• {}'],
   [' · {} 条新的', ' · {} new'], ['{} 条新的', '{} new'],
   ['· {}', '· {}'],
+  ['有新版本时会自动更新，不用重新安装。', 'New versions install automatically — no reinstalling.'],
   ['测试更新', 'Test update'], ['模拟收到一个新版本，完整走一遍更新流程', 'Simulate a new version and run the full update flow'],
   ['已模拟"检测到更新"：看右下角的通知或页面顶部的绿色横幅，点"立即更新"', 'Simulated "Update available": see the notification or the green banner at the top, then click "Update now"'],
   ['检测到更新：课程助手 {}（测试）', 'Update available: Course Helper {} (test)'],

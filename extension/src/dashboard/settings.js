@@ -317,14 +317,13 @@ function renderChangelog(body, ctx) {
         toast('已模拟"检测到更新"：看右下角的通知或页面顶部的绿色横幅，点"立即更新"');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } }, '测试更新') : null),
-    h('p', { class: 'hint' }, '热更新：电脑每分钟从 GitHub 拉取新版本，插件发现后弹出"检测到更新"，点"立即更新"几秒钟就好，不用重新装。'),
+    h('p', { class: 'hint' }, '有新版本时会自动更新，不用重新安装。'),
     ...VERSION_NOTES.filter((n) => getLang() !== 'en' || n.en).map((n) => {
       const en = getLang() === 'en' && n.en;
       // 没有英文版的旧说明保持中文原文（不做逐词替换）
       return h('div', { class: 'log' }, h('strong', {}, `v${n.v}`), h('span', { class: 'muted' }, ` · ${n.d}`),
         h('ul', {}, ...(en || n.items).map((x) => h('li', {}, x))));
-    }),
-    getLang() === 'en' ? h('p', { class: 'hint' }, 'Notes for earlier versions are available in Chinese only.') : null);
+    }));
 }
 
 // ---------------- 语言 ----------------
