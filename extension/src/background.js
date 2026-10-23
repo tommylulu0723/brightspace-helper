@@ -603,6 +603,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'testUpdate') {
     // 测试按钮：假装检测到一个新版本，后面完全走真实的更新流程（版本号不变）
     (async () => {
+      // 只有管理员能用
+      const { cloud: c } = await chrome.storage.local.get('cloud');
+      if (!c?.token || c.user?.role !== 'admin') { sendResponse({ ok: false, error: 'admin only' }); return; }
       const v = chrome.runtime.getManifest().version;
       const en = (await loadLang()) === 'en';
       const notes = ['这是一次测试更新：点"立即更新"后插件会重新加载', '开着的课程助手页面会在原位置自动重新打开'];

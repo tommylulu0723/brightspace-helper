@@ -312,7 +312,7 @@ function renderChangelog(body, ctx) {
     h('div', { class: 'btn-row' },
       h('span', { class: 'hint' }, `当前版本 ${ctx.store.version()}`),
       h('button', { type: 'button', class: 'btn small', title: '检测到更新后没反应时点这里', onClick: () => ctx.store.reload() }, icon(I.refresh, 14), '重新加载插件'),
-      ctx.store.testUpdate ? h('button', { type: 'button', class: 'btn small', title: '模拟收到一个新版本，完整走一遍更新流程', onClick: async () => {
+      ctx.store.testUpdate && ctx.state.cloud?.token && ctx.state.cloud?.user?.role === 'admin' ? h('button', { type: 'button', class: 'btn small', title: '模拟收到一个新版本，完整走一遍更新流程', onClick: async () => {
         await ctx.store.testUpdate();
         toast('已模拟"检测到更新"：看右下角的通知或页面顶部的绿色横幅，点"立即更新"');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -371,6 +371,6 @@ export function renderSettingsView(root, ctx) {
   section(root, 'account', (REQUIRE_LOGIN ? '账号与邮件提醒' : '账号与云同步（可选）'));
   once('diag', [st.data?.lastSync, st.data?.warnings], () => renderDiag(section(root, 'diag', '诊断'), ctx));
   section(root, 'diag', '诊断');
-  once('log', [1], () => renderChangelog(section(root, 'log', '更新日志'), ctx));
+  once('log', [ctx.state.cloud?.user?.role, !!ctx.state.cloud?.token], () => renderChangelog(section(root, 'log', '更新日志'), ctx));
   section(root, 'log', '更新日志');
 }

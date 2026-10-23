@@ -7,6 +7,12 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.6.4',
+    d: '2026-10-23',
+    items: ['"测试更新"按钮只有管理员能看到'],
+    en: ['The "Test update" button is now visible to admins only']
+  },
+  {
     v: '1.6.3',
     d: '2026-10-23',
     items: ['设置 → 更新日志 里加了"测试更新"按钮：模拟收到新版本，完整走一遍更新流程'],
