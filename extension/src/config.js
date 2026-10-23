@@ -7,6 +7,18 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.6.2',
+    d: '2026-10-23',
+    items: [
+      '更新更无感：没开着插件页面时直接在后台更新，只弹一条"已更新"通知',
+      '开着汇总页时点"立即更新"，页面会在原来的位置自动重新打开，停在同一个页面，不用自己再找'
+    ],
+    en: [
+      'Smoother updates: if no Course Helper page is open, updates install silently in the background with just an "Updated" notification',
+      'If the dashboard is open, clicking "Update now" reopens it in the same place and view — no need to find it again'
+    ]
+  },
+  {
     v: '1.6.1',
     d: '2026-10-23',
     items: [

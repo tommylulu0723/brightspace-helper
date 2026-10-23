@@ -109,7 +109,8 @@ async function checkSelfUpdate() {
   await chrome.storage.local.set({ pendingUpdate: pending });
 
   // 打开了自动更新，或者还被挡在登录 / 姓名核对页面（这时看不到更新提示，也没什么可打断的）：直接更新
-  if (settings.autoApplyUpdate || (await locked())) { applyUpdate(); return pending; }
+  // 直接更新、不打扰你的情况：打开了"自动安装更新"；还被挡在登录 / 核对页；或者现在根本没开着插件页面
+  if (settings.autoApplyUpdate || (await locked()) || !(await openExtensionTabs()).length) { applyUpdate(); return pending; }
   refreshBadge();
   notify(`pending:${disk.version}`, {
     type: 'basic',
@@ -123,12 +124,49 @@ async function checkSelfUpdate() {
   return pending;
 }
 
+// 现在开着的插件页面（汇总页等）：重启插件时 Chrome 会把它们关掉，记下来，更新完在原位置重新打开
+async function openExtensionTabs() {
+  try {
+    const ctxs = (await chrome.runtime.getContexts?.({ contextTypes: ['TAB'] })) || [];
+    const out = [];
+    for (const c of ctxs) {
+      if (c.tabId == null || c.tabId < 0) continue;
+      let tab = null;
+      try { tab = await chrome.tabs.get(c.tabId); } catch { /* 已经关了 */ }
+      out.push({ url: c.documentUrl, windowId: tab?.windowId, index: tab?.index, active: !!tab?.active, pinned: !!tab?.pinned });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 async function applyUpdate() {
   const { pendingUpdate } = await chrome.storage.local.get('pendingUpdate');
   const running = chrome.runtime.getManifest().version;
-  await chrome.storage.local.set({ justUpdated: { from: running, to: pendingUpdate?.to || '', at: new Date().toISOString() } });
+  const tabs = await openExtensionTabs();
+  await chrome.storage.local.set({
+    justUpdated: { from: running, to: pendingUpdate?.to || '', at: new Date().toISOString() },
+    reopenTabs: { at: Date.now(), tabs }
+  });
   await chrome.storage.local.remove('pendingUpdate');
   setTimeout(() => chrome.runtime.reload(), 200);
+}
+
+async function restoreTabs() {
+  const { reopenTabs } = await chrome.storage.local.get('reopenTabs');
+  if (!reopenTabs) return;
+  await chrome.storage.local.remove('reopenTabs');
+  if (Date.now() - reopenTabs.at > 2 * 60 * 1000) return; // 太久以前的不管
+  const list = [...(reopenTabs.tabs || [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  for (const t of list) {
+    if (!t.url || !t.url.startsWith(chrome.runtime.getURL(''))) continue;
+    try {
+      await chrome.tabs.create({ url: t.url, windowId: t.windowId, index: t.index, active: t.active, pinned: t.pinned });
+    } catch {
+      try { await chrome.tabs.create({ url: t.url, active: t.active }); } catch { /* ignore */ }
+    }
+  }
 }
 
 async function announceUpdate() {
@@ -453,6 +491,7 @@ async function cleanupRemovedAi() {
 chrome.runtime.onInstalled.addListener(async (details) => {
   await ensureAlarm();
   if (details.reason === 'update') {
+    await restoreTabs();
     await cleanupRemovedAi();
     await announceUpdate();
   }
@@ -531,7 +570,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg && msg.type === 'reload') {
     sendResponse({ ok: true });
-    setTimeout(() => chrome.runtime.reload(), 200);
+    // "重新加载插件"按钮：同样记下开着的页面，重启后在原位置打开
+    openExtensionTabs().then((tabs) => chrome.storage.local.set({ reopenTabs: { at: Date.now(), tabs } })).finally(() => setTimeout(() => chrome.runtime.reload(), 200));
     return false;
   }
   if (msg && msg.type === 'maybeSync') {

@@ -182,7 +182,7 @@ function renderBanner() {
       h('span', { class: 'up-text' },
         h('strong', {}, `检测到更新：${up.from} → ${up.to}`),
         up.notes?.length ? h('span', {}, ((getLang() === 'en' && up.notesEn) || up.notes).slice(0, 3).join(getLang() === 'en' ? '; ' : '；')) : null),
-      h('button', { type: 'button', class: 'btn small primary', onClick: (e) => { e.target.disabled = true; e.target.textContent = '正在更新…'; store.applyUpdate(); setTimeout(() => location.reload(), 2500); } }, '立即更新'));
+      h('button', { type: 'button', class: 'btn small primary', onClick: (e) => { e.target.disabled = true; e.target.textContent = '正在更新…'; store.applyUpdate(); } }, '立即更新'));
     a.hidden = false;
   } else {
     a.className = 'banner info';
