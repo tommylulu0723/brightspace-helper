@@ -208,6 +208,48 @@ await test('管理后台统计：同步人数、每人的课程 / 事项 / 课�
   assert.ok(!('passwordHash' in a));
   assert.ok(!('usage7d' in a));
 });
+await test('好久没同步提醒：48 小时后发一封，7 天后再发一封，之后不发；重新同步后重新计算；可以关掉', async () => {
+  await api('PUT', '/api/admin/settings', { token: admin, body: { registration: 'open' } });
+  const token = (await api('POST', '/api/auth/register', { body: { email: 'carol@nyu.edu', password: 'password123', firstName: 'Carol', lastName: 'King' } })).data.token;
+  await api('PUT', '/api/admin/settings', { token: admin, body: { registration: 'invite' } });
+  await api('POST', '/api/me/verify', { token, body: { firstName: 'Carol', lastName: 'King', identifier: '444' } });
+  // 选一个纽约白天的时间点 T（离现在 24 小时以内，别的测试用户不会被算成"好久没同步"）
+  const T = new Date(Math.ceil(Date.now() / 86400e3) * 86400e3 + 16 * 3600e3);
+  if (T.getTime() - Date.now() > 86400e3) T.setTime(T.getTime() - 86400e3);
+  const snapAt = T.getTime() - 50 * 3600e3;
+  const snap = { user: { id: '444' }, courses: [{ id: '9', name: 'Econ' }], items: [{ id: 'e1', courseId: '9', title: 'Essay 3', type: 'assignment', due: new Date(T.getTime() + 3 * 86400e3).toISOString(), status: 'open' }] };
+  await api('PUT', '/api/state', { token, body: { snapshot: snap, snapshotAt: snapAt, health: { state: 'error', code: 'AUTH_REQUIRED' } } });
+  const mine = () => outbox.filter((m) => m.to === 'carol@nyu.edu');
+  const r = await runReminders(T);
+  assert.equal(r.stale, 1);
+  assert.equal(mine().length, 1);
+  const m = mine()[0];
+  assert.match(m.subject, /2 天没更新/);
+  assert.ok(m.text.includes('登录过期') && m.text.includes('Essay 3'), m.text);
+  await runReminders(new Date(T.getTime() + 3600e3));
+  assert.equal(mine().length, 1, '同一次断档 7 天内不重复');
+  const users = (await api('GET', '/api/admin/users', { token: admin })).data.users;
+  const c = users.find((u) => u.email === 'carol@nyu.edu');
+  assert.equal(c.staleNotice.stage, 1);
+  assert.equal(c.health.code, 'AUTH_REQUIRED');
+  assert.ok(c.dataAt && c.pingAt);
+  assert.ok((await api('GET', '/api/admin/overview', { token: admin })).data.staleMailed7d >= 1);
+  await runReminders(new Date(T.getTime() + 7 * 86400e3));
+  assert.equal(mine().length, 2, '7 天后第二封');
+  await runReminders(new Date(T.getTime() + 9 * 86400e3));
+  assert.equal(mine().length, 2, '最多两封');
+  // 重新同步过一次，之后又断了：重新计算
+  await api('PUT', '/api/state', { token, body: { snapshot: snap, snapshotAt: snapAt + 9 * 86400e3 } });
+  await runReminders(new Date(T.getTime() + 9 * 86400e3));
+  assert.equal(mine().length, 3);
+  // 关掉这类提醒（只改 stale，不影响截止提醒）
+  const u = (await api('PATCH', '/api/me', { token, body: { reminders: { stale: false } } })).data.user;
+  assert.deepEqual(u.reminders, { h24: true, h3: true, stale: false });
+  await api('PUT', '/api/state', { token, body: { snapshot: snap, snapshotAt: snapAt + 10 * 86400e3 } });
+  await runReminders(new Date(T.getTime() + 13 * 86400e3));
+  assert.equal(mine().length, 3);
+  await api('DELETE', `/api/admin/users/${u.id}`, { token: admin });
+});
 await test('普通用户不能进管理后台', async () => {
   assert.equal((await api('GET', '/api/admin/users', { token: alice })).status, 403);
   assert.equal((await api('GET', '/api/admin/users')).status, 401);

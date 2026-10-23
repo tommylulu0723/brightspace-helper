@@ -235,6 +235,32 @@ export function createClient({ base = BASE_URL, fetcher = defaultFetch, fallback
 
     topicFileUrl(ou, topicId) {
       return `${base}${le()}/${ou}/content/topics/${topicId}/file`;
+    },
+
+    // ---------- 作业详情（点开一项时才读） ----------
+    dropboxFolder(ou, folderId) {
+      return get(`${le()}/${ou}/dropbox/folders/${folderId}`);
+    },
+    dropboxAttachmentUrl(ou, folderId, fileId) {
+      return `${base}${le()}/${ou}/dropbox/folders/${folderId}/attachments/${fileId}`;
+    },
+    submissionFileUrl(ou, folderId, submissionId, fileId) {
+      return `${base}${le()}/${ou}/dropbox/folders/${folderId}/submissions/${submissionId}/files/${fileId}`;
+    },
+    quiz(ou, quizId) {
+      return get(`${le()}/${ou}/quizzes/${quizId}`);
+    },
+    contentTopic(ou, topicId) {
+      return get(`${le()}/${ou}/content/topics/${topicId}`);
+    },
+    calendarEvent(ou, eventId) {
+      return get(`${le()}/${ou}/calendar/event/${eventId}`);
+    },
+    gradeObject(ou, gradeId) {
+      return get(`${le()}/${ou}/grades/${gradeId}`);
+    },
+    myGradeValue(ou, gradeId) {
+      return get(`${le()}/${ou}/grades/${gradeId}/values/myGradeValue`);
     }
   };
 }

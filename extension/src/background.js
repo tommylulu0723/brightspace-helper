@@ -12,6 +12,7 @@ import { withCustom } from './lib/custom.js';
 import { tr } from './lib/i18n.js';
 import { loadLang } from './lang.js';
 import { parseFirstNotes } from './lib/selfupdate.js';
+import { fetchDetail, putCache } from './lib/detail.js';
 
 const ALARM = 'sync';
 const SOON_ALARM = 'sync-soon';
@@ -449,6 +450,7 @@ async function cloudSync({ pushSnapshot = true } = {}) {
         merged.settings = keep;
       }
       const body = {
+        health: await healthInfo(),
         overrides: merged.overrides, overridesAt: merged.overridesAt,
         settings: publicSettings(merged.settings, merged.settingsTs), settingsAt: merged.settingsAt
       };
@@ -457,6 +459,7 @@ async function cloudSync({ pushSnapshot = true } = {}) {
         body.snapshotAt = Date.parse(st.data.lastSync) || Date.now();
       }
       await cloud.putState(c.server, c.token, body);
+      await chrome.storage.local.set({ healthPushedAt: Date.now() });
       const { cloud: cur } = await chrome.storage.local.get('cloud');
       await chrome.storage.local.set({ cloud: { ...(cur || c), user: me.user, flags: me.flags || {}, announcement: me.announcement || '', lastCloudSync: new Date().toISOString(), error: null } });
       await refreshBadge();
@@ -475,6 +478,19 @@ async function cloudSync({ pushSnapshot = true } = {}) {
     }
   })();
   return cloudRunning;
+}
+
+// 告诉服务器"插件还在运行，最近一次同步结果是什么"：
+// 读不到 Brightspace 时数据不会上传，服务器靠这个判断"好久没同步"是因为登录过期还是电脑没开
+async function healthInfo() {
+  const { status = {} } = await chrome.storage.local.get('status');
+  return { state: status.state || '', code: status.error?.code || '', lastAttempt: status.lastAttempt || '', version: chrome.runtime.getManifest().version };
+}
+async function pushHealth() {
+  const { cloud: c, healthPushedAt = 0 } = await chrome.storage.local.get(['cloud', 'healthPushedAt']);
+  if (!c?.token || c.user?.verify?.status !== 'ok' || Date.now() - healthPushedAt < 3600 * 1000) return;
+  await chrome.storage.local.set({ healthPushedAt: Date.now() });
+  try { await cloud.putState(c.server, c.token, { health: await healthInfo() }); } catch { /* 下次再说 */ }
 }
 
 function scheduleCloudPush() {
@@ -515,6 +531,7 @@ function syncNow(reason, { forceMaterials = false } = {}) {
         : { code: auth ? 'AUTH_REQUIRED' : 'ERROR', message: e?.message || String(e) };
       await setStatus({ state: 'error', error, lastAttempt: startedAt });
       await refreshBadge();
+      if (!offline) pushHealth();
       if (auth && reason !== 'manual') await notifyLoginExpired();
       return { ok: false, error };
     } finally {
@@ -668,6 +685,22 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg && msg.type === 'download' && Array.isArray(msg.files)) {
     downloadFiles(msg.files).then(sendResponse);
+    return true;
+  }
+  if (msg && msg.type === 'detail' && msg.item) {
+    // 点开一项：读老师写的要求、附件、评分标准，存一份在本机，下次秒开
+    (async () => {
+      try {
+        const client = createClient({ fallbackFetcher: tabFetcher });
+        await client.init();
+        const d = await fetchDetail(client, msg.item);
+        const { details = {} } = await chrome.storage.local.get('details');
+        await chrome.storage.local.set({ details: putCache(details, msg.item.id, d) });
+        sendResponse({ ok: true, detail: d });
+      } catch (e) {
+        sendResponse({ ok: false, code: e?.code === 'AUTH_REQUIRED' ? 'AUTH_REQUIRED' : 'ERROR', error: e?.message || String(e) });
+      }
+    })();
     return true;
   }
   if (msg && msg.type === 'openDashboard') {

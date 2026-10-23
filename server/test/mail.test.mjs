@@ -4,6 +4,7 @@ import net from 'node:net';
 import { sendMail, buildMessage } from '../lib/mailer.js';
 import { namesMatch, normName } from '../lib/names.js';
 import { pickReminders, buildReminderEmail, fmtDue } from '../lib/reminders.js';
+import { staleCheck, upcomingFrom, buildStaleEmail, nyHour } from '../lib/stale.js';
 
 let n = 0;
 const test = async (name, fn) => { await fn(); n++; console.log(`  ✓ ${name}`); };
@@ -111,6 +112,33 @@ await test('提醒邮件内容：纽约时间、剩余时间、旧数据提示',
   assert.ok(mail.html.includes('HW &lt;1&gt;'), 'HTML 转义');
   assert.ok(mail.text.includes('3 天前的同步'));
   assert.ok(mail.subject.startsWith('📌'));
+});
+
+await test('好久没同步：判断时机、原因、夜里不发', () => {
+  const now = new Date('2026-10-22T16:00:00Z'); // 纽约 12:00
+  assert.equal(nyHour(now), 12);
+  const at = (h) => now.getTime() - h * 3600e3;
+  const recent = new Date(now.getTime() - 3600e3).toISOString();
+  assert.equal(staleCheck({ user: {}, state: { snapshotAt: at(47) }, now }), null, '不到 48 小时');
+  assert.equal(staleCheck({ user: {}, state: {}, now }), null, '从来没同步过');
+  assert.equal(staleCheck({ user: {}, state: { snapshotAt: at(31 * 24) }, now }), null, '一个月没用了，不打扰');
+  assert.deepEqual(staleCheck({ user: { pingAt: recent }, state: { snapshotAt: at(50) }, now }).reason, 'login');
+  assert.deepEqual(staleCheck({ user: {}, state: { snapshotAt: at(50) }, now }).reason, 'offline');
+  assert.equal(staleCheck({ user: { reminders: { stale: false } }, state: { snapshotAt: at(50) }, now }), null);
+  const night = new Date('2026-10-23T03:00:00Z'); // 纽约 23:00
+  assert.equal(staleCheck({ user: {}, state: { snapshotAt: night.getTime() - 50 * 3600e3 }, now: night }), null, '夜里不发');
+  const once = { for: at(100), count: 1 };
+  assert.equal(staleCheck({ user: {}, state: { snapshotAt: at(100), staleNotice: once }, now }), null, '第二封要等到 7 天');
+  assert.equal(staleCheck({ user: {}, state: { snapshotAt: at(170), staleNotice: { for: at(170), count: 1 } }, now }).stage, 2);
+  const up = upcomingFrom({ snapshot: { courses: [{ id: '1', name: 'A' }], items: [
+    { id: 'x', courseId: '1', title: 'Soon', due: new Date(now.getTime() + 86400e3).toISOString() },
+    { id: 'y', courseId: '1', title: 'Far', due: new Date(now.getTime() + 9 * 86400e3).toISOString() },
+    { id: 'z', courseId: '1', title: 'Done', due: new Date(now.getTime() + 86400e3).toISOString() }
+  ] }, now, isDone: (it) => it.id === 'z' });
+  assert.deepEqual(up.map((p) => p.item.title), ['Soon']);
+  const en = buildStaleEmail({ name: 'Amy', hours: 75, reason: 'offline', upcoming: up, lang: 'en', siteUrl: 'https://x.cn' });
+  assert.equal(en.subject, "Course Helper hasn't synced for 3 days");
+  assert.ok(en.text.includes("hasn't run") && en.text.includes('Soon') && en.html.includes('https://x.cn/m/'));
 });
 
 console.log(`\n全部 ${n} 个测试通过`);

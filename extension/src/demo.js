@@ -126,3 +126,37 @@ export function demoData(now = new Date()) {
     usingFallback: false
   };
 }
+
+// 演示模式下点开一项看到的详情（真实情况从 Brightspace 读）
+export function demoDetail(item, now = new Date()) {
+  const base = { instructions: { html: '', text: '' }, attachments: [], links: [], rubrics: [], submissions: [], feedback: null, grade: null, fetchedAt: now.toISOString(), warnings: [] };
+  const src = item.source || String(item.id || '').split(':')[0];
+  if (item.status === 'submitted') {
+    return { ...base, points: 10, submissions: [{ at: new Date(Date.parse(item.due) - 3 * 3600e3).toISOString(), comment: '', files: [{ name: 'response7.pdf', size: 88211, url: null }] }],
+      instructions: { html: '<p>Write 300–500 words responding to this week\'s reading.</p>', text: '' } };
+  }
+  if (src === 'quiz') {
+    return { ...base, timeLimit: 20, attempts: 1, points: 10, start: new Date(Date.parse(item.due) - 7 * 86400e3).toISOString(), closes: item.due,
+      instructions: { html: '<p>This quiz covers <strong>this week\'s reading</strong>. You have one attempt and 20 minutes once you start.</p><ul><li>Open book, but no collaboration.</li><li>Questions are shown one at a time; you cannot go back.</li></ul>', text: '' } };
+  }
+  if (item.type === 'exam') {
+    return { ...base, location: 'Silver Center 207', start: new Date(Date.parse(item.due) - 75 * 60e3).toISOString(),
+      instructions: { html: '<p>Covers chapters 1–5. Bring a pencil and a calculator (no phones). One double-sided A4 cheat sheet is allowed.</p>', text: '' },
+      links: [{ name: 'Practice exam (PDF)', url: 'https://example.com/practice.pdf' }] };
+  }
+  if (src === 'dropbox') {
+    const crit = (name, a, b, c) => ({ name, cells: [{ text: a, points: 4 }, { text: b, points: 2.5 }, { text: c, points: 1 }] });
+    return { ...base, points: 20, start: new Date(Date.parse(item.due) - 7 * 86400e3).toISOString(), due: item.due,
+      lateUntil: new Date(Date.parse(item.due) + 2 * 86400e3).toISOString(), submitType: 'file', fileTypes: ['.zip', '.html'],
+      instructions: { html: `<p>Build a responsive version of the portfolio page from Lab 5.</p><h3>Requirements</h3><ol><li>Mobile-first CSS with at least <b>two breakpoints</b> (768px and 1200px).</li><li>Use CSS Grid for the project gallery and Flexbox for the nav bar.</li><li>No CSS frameworks (Bootstrap, Tailwind…).</li></ol><p>Submit a single <code>.zip</code> with your <code>index.html</code> and <code>styles.css</code>. Late submissions lose 10% per day.</p><p>Questions? Post in the <a href="https://brightspace.nyu.edu/d2l/home">Lab 6 discussion</a>.</p>`, text: '' },
+      attachments: [{ name: 'lab6-starter.zip', size: 184320, url: 'https://example.com/lab6-starter.zip' }, { name: 'Lab 6 rubric.pdf', size: 52211, url: 'https://example.com/rubric.pdf' }],
+      rubrics: [{ name: 'Lab rubric', description: '', groups: [{ name: '', levels: [{ name: 'Excellent', points: 4 }, { name: 'OK', points: 2.5 }, { name: 'Missing', points: 1 }], criteria: [
+        crit('Layout works on phone, tablet, desktop', 'All three sizes look right', 'One size has problems', 'Not responsive'),
+        crit('Grid & Flexbox used correctly', 'Both used where appropriate', 'Only one used', 'Neither used'),
+        crit('Code quality', 'Clean, commented, valid', 'Some issues', 'Hard to read'),
+        crit('Accessibility', 'Alt text, contrast, focus states', 'Partly done', 'Not considered'),
+        crit('Submitted correctly', 'Single .zip, right files', 'Wrong format', 'Missing files')
+      ] }] }] };
+  }
+  return { ...base, instructions: { html: '<p>Reply to two classmates\' posts with at least 100 words each.</p>', text: '' } };
+}

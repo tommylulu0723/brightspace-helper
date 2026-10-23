@@ -7,6 +7,18 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.8.0',
+    d: '2026-10-23',
+    items: [
+      '点作业标题就能直接看详情：老师写的要求、附件、评分标准、分值、你的提交记录和成绩，不用再进 Brightspace 一层层点（按住 Ctrl / ⌘ 点还是直接打开 Brightspace）',
+      '超过 2 天没同步（比如 Brightspace 登录过期、电脑一直没开）时，会发邮件提醒你，免得漏掉新作业；可以在设置 → 账号里关掉'
+    ],
+    en: [
+      'Click an assignment title to see its details right here: instructions, attachments, rubric, points, your submissions and grade — no more clicking through Brightspace (Ctrl / ⌘-click still opens Brightspace)',
+      'If it hasn\'t synced for 2 days (e.g. your Brightspace login expired or your computer was off), you get an email so you don\'t miss new work; turn it off in Settings → Account'
+    ]
+  },
+  {
     v: '1.7.0',
     d: '2026-10-23',
     items: [

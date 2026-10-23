@@ -295,6 +295,32 @@ const D = [
   [' · 登录后课程助手会自动读取你的课程，并核对姓名。', ' · Once you log in, Course Helper reads your courses and checks your name automatically.'],
   ['正在读取 Brightspace…', 'Reading Brightspace…'], ['读取', 'Read'],
   ['还没读取 Brightspace。确认 Chrome 里已经登录 Brightspace，然后点"读取"。', 'Brightspace hasn\'t been read yet. Make sure you\'re logged in to Brightspace in Chrome, then click "Read".'],
+  // ---------- 作业详情 ----------
+  ['关闭', 'Close'], ['刷新', 'Refresh'], ['正在刷新…', 'Refreshing…'], ['更新于 {}', 'Updated {}'], ['在 Brightspace 打开', 'Open in Brightspace'],
+  ['嵌入的内容（点这里打开）', 'Embedded content (click to open)'], ['下载', 'Download'], ['全部下载', 'Download all'],
+  ['评分项', 'Criterion'], ['{} 分', '{} pts'], ['截止', 'Due'], ['考试时间', 'When'], ['开放', 'Opens'], ['迟交截止', 'Late until'],
+  ['{}（截止后还能交，一般算迟交）', '{} (still accepted after the deadline, usually marked late)'], ['关闭时间', 'Closes'],
+  ['分值', 'Points'], ['限时', 'Time limit'], ['次数', 'Attempts'], ['不限次数', 'Unlimited'], ['{} 次', '{}'],
+  ['密码', 'Password'], ['需要密码（老师会告诉你）', 'Password required (your instructor will share it)'],
+  ['地点', 'Location'], ['形式', 'Format'], ['小组作业', 'Group assignment'], ['提交方式', 'Submission'],
+  ['在线输入文字', 'Text typed online'], ['纸质提交', 'On paper'], ['现场考核', 'In person'], ['文件类型', 'File types'],
+  ['正在从 Brightspace 读取作业要求…', 'Loading details from Brightspace…'],
+  ['刷新失败：Brightspace 登录过期了，下面是之前读到的内容。', 'Couldn\'t refresh — your Brightspace login expired. Showing what was loaded before.'],
+  ['刷新失败，下面是之前读到的内容。', 'Couldn\'t refresh. Showing what was loaded before.'],
+  ['成绩与评语', 'Grade & feedback'], ['要求', 'Instructions'],
+  ['老师没有在 Brightspace 上写考试说明。', 'No exam instructions on Brightspace.'],
+  ['老师没有在 Brightspace 上写说明，可能写在附件或课件里。', 'No instructions on Brightspace — they may be in an attachment or the course content.'],
+  ['附件（{}）', 'Attachments ({})'], ['链接', 'Links'], ['评分标准', 'Rubric'], ['我的提交', 'My submissions'],
+  ['最近一次', 'Latest'], ['第 {} 次', 'Attempt {}'], ['{} 提交', 'Submitted {}'], ['迟交', 'Late'],
+  ['Brightspace 上还没有你的提交记录。', 'No submissions from you on Brightspace yet.'],
+  ['在 Brightspace 打开可以看到完整页面。', 'Open it in Brightspace to see the full page.'],
+  ['需要登录 Brightspace 才能读取详情', 'Log in to Brightspace to load details'], ['在 Chrome 里登录 Brightspace 后再点开就行。', 'Log in to Brightspace in Chrome, then open this again.'],
+  ['读不到这一项的详情', 'Couldn\'t load details for this item'],
+  ['可能是网络问题，或者老师设置了不能通过接口查看。可以直接在 Brightspace 里打开。', 'It may be a network problem, or the course doesn\'t allow it. You can open it in Brightspace directly.'],
+  ['开始下载 {} 个文件', 'Downloading {} files'], ['开始下载 {}', 'Downloading {}'], ['{} 个文件下载失败', '{} downloads failed'],
+  ['查看详情（按住 Ctrl / ⌘ 点击直接在 Brightspace 打开）', 'View details (Ctrl / ⌘-click to open in Brightspace)'],
+  ['超过 2 天没同步时提醒我', 'Tell me when it hasn\'t synced for 2 days'],
+  ['比如 Brightspace 登录过期了、电脑一直没开，提醒邮件用的就是旧数据，这时会发邮件告诉你', 'E.g. your Brightspace login expired or your computer was off — reminders would be based on old data, so you get an email'],
   ['核对姓名失败：{}', 'Name check failed: {}'], ['正在核对姓名（Brightspace：{} {}）…', 'Checking your name (Brightspace: {0} {1})…'],
 ];
 
@@ -329,6 +355,8 @@ function single(s, depth) {
 }
 
 function core(s, depth) {
+  // 开头的 "· " 是拼接用的分隔符，先拿掉再翻（不然"{} 小时"这类句型会把它吞进去，翻成"· 15 left h"）
+  if (s.startsWith('· ') && !exact.has(s)) return `· ${tr(s.slice(2), depth + 1)}`;
   const hit = single(s, depth);
   if (hit != null) return hit;
   // 用 " · " 拼起来的句子：拆开分别翻译；能整体对上的几段（比如"本学期 · 未同步"）合在一起翻
@@ -371,6 +399,7 @@ const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT']);
 function translateNode(n) {
   if (n.nodeType === 3) {
     if (n.parentNode && SKIP.has(n.parentNode.nodeName)) return;
+    if (n.parentElement && n.parentElement.closest('[data-no-tr]')) return;
     const v = n.nodeValue;
     if (v && CJK.test(v)) { const t = tr(v); if (t !== v) n.nodeValue = t; }
     return;

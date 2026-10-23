@@ -126,6 +126,7 @@ async function loadOverview() {
     stat('7 天活跃', o.active7d, `本周新注册 ${o.newUsers7d}`),
     stat('24 小时内同步过', o.synced24h, `${o.sessions} 个登录设备`),
     stat('今天同步', o.today.users, `${o.today.syncs} 次同步`),
+    stat('超过 2 天没同步', o.stale || 0, o.stale ? `7 天内发了 ${o.staleMailed7d || 0} 封"好久没同步"提醒` : '大家的数据都是新的', o.stale ? 'warn' : ''),
     stat('通过 Brightspace 校验', o.verified, o.unverified ? `${o.unverified} 人还没通过` : '全部通过', o.unverified ? 'warn' : ''),
     stat('待处理反馈', o.feedbackOpen || 0, o.feedbackOpen ? '去"反馈"页看看' : '没有新反馈', o.feedbackOpen ? 'warn' : ''),
     stat('今天发出提醒邮件', o.mail.configured ? o.mail.today.sent : '未开启', o.mail.configured ? `${o.remindersOn} 人开着提醒${o.mail.today.failed ? ` · ${o.mail.today.failed} 封失败` : ''}` : '去"邮件提醒"设置发信邮箱', o.mail.today.failed || !o.mail.configured ? 'warn' : '')
@@ -157,7 +158,7 @@ function renderUsers() {
   const q = $('userQ').value.trim().toLowerCase();
   const list = users.filter((u) => !q || `${u.name} ${u.email} ${u.verify?.bsName || ''}`.toLowerCase().includes(q)).sort((a, b) => Date.parse(b.lastSeenAt || 0) - Date.parse(a.lastSeenAt || 0));
   $('usersSub').textContent = `${users.length} 个用户`;
-  const head = h('tr', {}, ...['用户', 'Brightspace 校验', '角色', '最近活跃', '最近同步', '课程 / 事项 / 课件', '提醒邮件', ''].map((t, i) => h('th', { class: i === 5 || i === 6 ? 'num' : '' }, t)));
+  const head = h('tr', {}, ...['用户', 'Brightspace 校验', '角色', '最近活跃', '数据更新于', '课程 / 事项 / 课件', '提醒邮件', ''].map((t, i) => h('th', { class: i === 5 || i === 6 ? 'num' : '' }, t)));
   const VS = { ok: ['已通过', 'ok'], mismatch: ['姓名不一致', 'danger'], taken: ['账号被占用', 'danger'], pending: ['等待校验', 'neutral'] };
   const rows = list.map((u) => {
     const self = me && u.id === me.id;
@@ -174,7 +175,7 @@ function renderUsers() {
       })()),
       h('td', {}, u.disabled ? h('span', { class: 'chip danger' }, '已停用') : u.role === 'admin' ? h('span', { class: 'chip accent' }, '管理员') : h('span', { class: 'chip neutral' }, '用户')),
       h('td', { class: 'muted' }, ago(u.lastSeenAt)),
-      h('td', { class: 'muted' }, ago(u.lastSyncAt)),
+      h('td', { class: 'muted' }, dataCell(u)),
       h('td', { class: 'num' }, `${u.stats.courses} / ${u.stats.items} / ${u.stats.files}`),
       h('td', { class: 'num muted' }, u.reminders && !u.reminders.h24 && !u.reminders.h3 ? '已关闭' : `${u.reminderCount || 0} 封`, h('div', {}, u.lastReminderAt ? `最近 ${ago(u.lastReminderAt)}` : `${u.sessions} 台设备 · ${kb(u.storageBytes)}`)),
       h('td', {}, h('div', { class: 'actions' },
@@ -211,6 +212,21 @@ function renderUsers() {
   $('usersTable').replaceChildren(h('thead', {}, head), h('tbody', {}, ...(rows.length ? rows : [h('tr', {}, h('td', { colspan: 8, class: 'empty-row' }, '没有用户'))])));
 }
 $('userQ').addEventListener('input', renderUsers);
+
+// "数据更新于"：插件最后一次成功读到 Brightspace 的时间；超过 2 天标黄，并写出可能的原因
+const HEALTH = { AUTH_REQUIRED: 'Brightspace 登录过期', OFFLINE: '电脑没联网', ERROR: '同步出错' };
+function dataCell(u) {
+  const at = u.dataAt || u.lastSyncAt;
+  if (!at) return '—';
+  const old = Date.now() - Date.parse(at) > 2 * 86400e3;
+  const why = u.health?.state === 'error' ? HEALTH[u.health.code] || '同步出错' : '';
+  const pinged = u.pingAt && Date.now() - Date.parse(u.pingAt) < 86400e3;
+  return h('div', { class: 'vchip' },
+    old ? h('span', { class: 'chip warn' }, ago(at)) : h('span', {}, ago(at)),
+    old ? h('small', {}, why || (pinged ? '插件在线但读不到 Brightspace' : '插件没在运行')) : why ? h('small', {}, why) : null,
+    u.staleNotice ? h('small', {}, `${ago(u.staleNotice.at)}发过提醒（第 ${u.staleNotice.stage} 封）`) : null,
+    u.reminders?.stale === false ? h('small', {}, '已关闭"好久没同步"提醒') : null);
+}
 
 // ---------------- 邀请码 ----------------
 async function loadInvites() {
@@ -284,7 +300,7 @@ async function loadMail() {
     stat('开着提醒的人', o.remindersOn, `共 ${o.verified} 人通过校验`),
     stat('最近一次失败', o.mail.lastError ? '有' : '无', o.mail.lastError || '')
   );
-  const KIND = { reminder: '截止提醒', test: '用户测试', 'admin-test': '后台测试' };
+  const KIND = { reminder: '截止提醒', stale: '好久没同步', test: '用户测试', 'admin-test': '后台测试' };
   const head = h('tr', {}, ...['时间', '类型', '收件人', '标题', '结果'].map((t) => h('th', {}, t)));
   const rows = log.map((x) => h('tr', {},
     h('td', { class: 'muted' }, new Date(x.at).toLocaleString('zh-CN')),

@@ -45,23 +45,24 @@ function verifyLine(u) {
 
 function remindersBox(c, ctx) {
   const u = c.user;
-  const r = u.reminders || { h24: true, h3: true };
+  const r = u.reminders || { h24: true, h3: true, stale: true };
   const save = async (patch) => {
     try {
-      const out = await cloud.updateProfile(c.server, c.token, { reminders: { ...r, ...patch } });
+      const out = await cloud.updateProfile(c.server, c.token, { reminders: patch });
       await ctx.store.set({ cloud: { ...ctx.state.cloud, user: out.user } });
       toast('已保存');
     } catch (e) { toast(`没保存上：${e.message}`); }
   };
-  const box = (key, label) => {
+  const box = (key, label, hint) => {
     const input = h('input', { type: 'checkbox', checked: r[key] !== false });
     input.addEventListener('change', () => save({ [key]: input.checked }));
-    return h('label', { class: 'check-row' }, input, h('span', {}, h('b', {}, label)));
+    return h('label', { class: 'check-row' }, input, h('span', {}, h('b', {}, label), hint ? h('small', {}, hint) : null));
   };
   return h('div', { class: 'reminder-box' },
     h('div', { class: 'reminder-head' }, h('strong', {}, '邮件提醒'), h('span', { class: 'muted' }, `发到 ${u.email}，没交的作业 / 测验才会提醒；电脑关机也照样发`)),
     box('h24', '截止前 24 小时'),
     box('h3', '截止前 3 小时'),
+    box('stale', '超过 2 天没同步时提醒我', '比如 Brightspace 登录过期了、电脑一直没开，提醒邮件用的就是旧数据，这时会发邮件告诉你'),
     h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn small', onClick: async (e) => {
       e.currentTarget.disabled = true;
       try { await cloud.testEmail(c.server, c.token); toast(`测试邮件已发到 ${u.email}，没收到就看看垃圾邮件`); } catch (x) { toast(x.message); }

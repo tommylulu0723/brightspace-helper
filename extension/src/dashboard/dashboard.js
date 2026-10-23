@@ -19,6 +19,7 @@ import { cloud as cloudApi } from '../lib/cloud.js';
 import { renderGate, resetGate } from './gate.js';
 import { openFeedback, buildDiagnostics } from './feedback.js';
 import { startTour } from './tour.js';
+import { openDetail } from './detail.js';
 import { REQUIRE_LOGIN } from '../config.js';
 import { loadLang, loadTheme, applyTheme, THEMES } from '../lang.js';
 import { translatePage, getLang, setLang } from '../lib/i18n.js';
@@ -377,7 +378,7 @@ function renderRow(it, { now, colors, names }) {
       onClick: () => setDone(it, !done)
     }, icon(I.check, 14)),
     h('div', { class: 'body' },
-      it.url ? h('a', { class: 'title', href: it.url, target: '_blank', rel: 'noopener' }, it.title)
+      it.url && !it.custom ? titleLink(it, { colors, names })
         : it.custom ? h('button', { type: 'button', class: 'title link-title', title: '编辑', onClick: () => customDialog(it) }, it.title)
         : h('span', { class: 'title' }, it.title),
       h('div', { class: 'meta' },
@@ -388,6 +389,31 @@ function renderRow(it, { now, colors, names }) {
     h('div', { class: 'due' },
       h('span', { class: `chip ${tone}` }, formatDue(it.due, now)),
       done || g === 'unverified' ? null : h('span', { class: 'rel' }, formatRelative(it.due, now))));
+}
+
+// 点标题：在旁边打开详情（要求、附件、评分标准）；按住 Ctrl / ⌘ 点还是直接去 Brightspace
+function titleLink(it, ctx) {
+  return h('a', {
+    class: 'title', href: it.url, target: '_blank', rel: 'noopener', title: '查看详情（按住 Ctrl / ⌘ 点击直接在 Brightspace 打开）',
+    onClick: (e) => {
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      showDetail(it, ctx);
+    }
+  }, it.title);
+}
+
+function showDetail(it, { colors, names }) {
+  openDetail(it, {
+    store, colors, names,
+    isDone: (x) => isDone(x, state.overrides),
+    setDone: (x, done) => {
+      setDone(x, done);
+      state.overrides = { ...state.overrides }; // 抽屉里的按钮马上变（storage 回调稍后会再刷新一次）
+      for (const id of x.ids || [x.id]) delete state.overrides[id];
+      if (done !== isDoneStatus(x.status)) state.overrides[x.id] = done;
+    }
+  });
 }
 
 // ---------------- 自己添加截止事项 ----------------
@@ -642,7 +668,8 @@ function renderPlan(byCourse, ctx) {
       h('span', { class: 'plan-rank', 'aria-hidden': 'true' }, String(i + 1)),
       h('button', { type: 'button', class: 'check', style: `--cc:${cc}`, 'aria-pressed': 'false', 'aria-label': `标记完成：${it.title}`, title: '标记完成', onClick: () => setDone(it, true) }, icon(I.check, 14)),
       h('div', { class: 'body' },
-        it.url ? h('a', { class: 'title', href: it.url, target: '_blank', rel: 'noopener' }, it.title) : h('span', { class: 'title' }, it.title),
+        it.custom ? h('button', { type: 'button', class: 'title link-title', title: '编辑', onClick: () => customDialog(it) }, it.title)
+          : it.url ? titleLink(it, ctx) : h('span', { class: 'title' }, it.title),
         h('div', { class: 'meta' }, h('span', { class: 'course-tag', style: `--cc:${cc}` }, names[it.courseId] || ''), h('span', {}, TYPE_LABEL[it.type] || '其他'))),
       h('span', { class: `chip ${it.reason.tone}` }, it.reason.text));
   });

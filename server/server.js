@@ -11,13 +11,14 @@ import {
 import { namesMatch, displayName } from './lib/names.js';
 import { sendMail, smtpConfigured } from './lib/mailer.js';
 import { pickReminders, pruneSent, buildReminderEmail, itemKey } from './lib/reminders.js';
+import { staleCheck, upcomingFrom, buildStaleEmail } from './lib/stale.js';
 
 // 和插件共用"是否已完成"的判断：Docker 里在 ./shared/lib，源码里在 ../extension/src/lib
 const __here = path.dirname(fileURLToPath(import.meta.url));
 const FORMAT_JS = [path.join(__here, 'shared/lib/format.js'), path.join(__here, '../extension/src/lib/format.js')].find((f) => fs.existsSync(f));
 const { isDone } = await import(FORMAT_JS);
 
-export const SERVER_VERSION = '1.1.0';
+export const SERVER_VERSION = '1.2.0';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SESSION_IDLE_DAYS = 60;
 const DAY = 24 * 3600 * 1000;
@@ -52,7 +53,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
   const publicUser = (u) => ({
     id: u.id, email: u.email, name: u.name, firstName: u.firstName || '', lastName: u.lastName || '', role: u.role, createdAt: u.createdAt,
     verify: u.verify || { status: 'pending' },
-    reminders: { h24: u.reminders?.h24 !== false, h3: u.reminders?.h3 !== false },
+    reminders: { h24: u.reminders?.h24 !== false, h3: u.reminders?.h3 !== false, stale: u.reminders?.stale !== false },
     lang: u.lang === 'en' ? 'en' : 'zh',
     mustChangePassword: !!u.mustChangePassword
   });
@@ -186,9 +187,12 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     reminderRunning = true;
     let sent = 0;
     let failed = 0;
+    let stale = 0;
     try {
       for (const u of D().users) {
         if (u.disabled || !verified(u)) continue;
+        // 好久没同步：单独一封，和截止提醒互不影响
+        try { if (await runStale(u, now)) stale += 1; } catch { failed += 1; }
         if (u.reminders?.h24 === false && u.reminders?.h3 === false) continue;
         const st = db.readState(u.id);
         if (!st.snapshot) continue;
@@ -216,7 +220,28 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       reminderRunning = false;
       db.save();
     }
-    return { ok: true, sent, failed };
+    return { ok: true, sent, failed, stale };
+  }
+
+  // 插件超过 48 小时没读到 Brightspace：发邮件提醒（同一次断档最多 2 封）
+  async function runStale(u, now) {
+    const st = db.readState(u.id);
+    const hit = staleCheck({ user: u, state: st, now });
+    if (!hit) return false;
+    const upcoming = upcomingFrom({ snapshot: st.snapshot, overrides: st.overrides || {}, hiddenCourseIds: st.settings?.hiddenCourseIds || [], now, isDone });
+    const mail = buildStaleEmail({ name: u.firstName || u.name, hours: hit.hours, reason: hit.reason, upcoming, siteUrl: siteUrl(), lang: u.lang });
+    try {
+      await deliver(u.email, mail, { kind: 'stale', userId: u.id });
+    } finally {
+      // 发失败也记一次，免得每 5 分钟重试轰炸（失败原因在发信记录里）
+      const fresh = db.readState(u.id);
+      if ((fresh.snapshotAt || 0) === (st.snapshotAt || 0)) {
+        fresh.staleNotice = { for: st.snapshotAt, count: hit.stage, lastAt: now.toISOString(), reason: hit.reason };
+        db.writeState(u.id, fresh);
+      }
+      u.staleNotice = { at: now.toISOString(), stage: hit.stage, reason: hit.reason };
+    }
+    return true;
   }
 
   function flagsFor() {
@@ -319,7 +344,9 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     }
     if (body.lang === 'en' || body.lang === 'zh') user.lang = body.lang;
     if (body.reminders && typeof body.reminders === 'object') {
-      user.reminders = { h24: body.reminders.h24 !== false, h3: body.reminders.h3 !== false };
+      const r = body.reminders;
+      const old = user.reminders || {};
+      user.reminders = { h24: (r.h24 ?? old.h24) !== false, h3: (r.h3 ?? old.h3) !== false, stale: (r.stale ?? old.stale) !== false };
     }
     db.save();
     return { user: publicUser(user) };
@@ -416,6 +443,11 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
     if (D().settings.flags.sync === false) throw new HttpError(403, '管理员暂时关闭了云同步', 'SYNC_OFF');
     const s = db.readState(user.id);
     let changed = false;
+    // 插件每次连上来都报告一下自己的同步状态（"好久没同步"提醒靠它判断原因）
+    user.pingAt = new Date().toISOString();
+    if (body.health && typeof body.health === 'object') {
+      user.health = { state: str(body.health.state, 12), code: str(body.health.code, 24), at: user.pingAt, lastAttempt: str(body.health.lastAttempt, 30), version: str(body.health.version, 16) };
+    }
     if (body.overrides && typeof body.overrides === 'object' && num(body.overridesAt, 1e14) >= (s.overridesAt || 0)) {
       const clean = {};
       for (const [k, v] of Object.entries(body.overrides).slice(0, 5000)) if (typeof v === 'boolean') clean[str(k, 120)] = v;
@@ -432,6 +464,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       s.snapshot = body.snapshot;
       s.snapshotAt = num(body.snapshotAt, 1e14);
       user.lastSyncAt = new Date().toISOString();
+      user.dataAt = new Date(s.snapshotAt).toISOString();
       const act = ((D().activity ||= {})[today()] ||= { syncs: 0, users: [] });
       act.syncs += 1;
       if (!act.users.includes(user.id)) act.users.push(user.id);
@@ -445,6 +478,7 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       changed = true;
     }
     if (changed) db.writeState(user.id, s);
+    else db.save();
     return { ok: true, overridesAt: s.overridesAt || 0, settingsAt: s.settingsAt || 0, snapshotAt: s.snapshotAt || 0 };
   }, { limit: 8 * 1024 * 1024 });
 
@@ -477,6 +511,9 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
       mail: { configured: smtpConfigured(mailCfg()), today: D().mailStats?.[today()] || { sent: 0, failed: 0 }, lastError: (D().mailLog || []).find((m) => !m.ok)?.error || '' },
       feedbackOpen: (D().feedback || []).filter((f) => f.status === 'open').length,
       remindersOn: users.filter((u) => verified(u) && (u.reminders?.h24 !== false || u.reminders?.h3 !== false)).length,
+      // 数据超过 48 小时没更新的人（只算 30 天内同步过的）
+      stale: users.filter((u) => verified(u) && !u.disabled && u.dataAt && now - Date.parse(u.dataAt) > 2 * DAY && now - Date.parse(u.dataAt) < 30 * DAY).length,
+      staleMailed7d: (D().mailLog || []).filter((m) => m.kind === 'stale' && m.ok && now - Date.parse(m.at) < 7 * DAY).length,
       sessions: D().sessions.length,
       serverTime: new Date().toISOString()
     };
@@ -490,6 +527,10 @@ export function createServer({ dataDir = process.env.DATA_DIR || path.join(__dir
         disabled: !!u.disabled,
         lastSeenAt: u.lastSeenAt,
         lastSyncAt: u.lastSyncAt,
+        dataAt: u.dataAt || null,
+        pingAt: u.pingAt || null,
+        health: u.health || null,
+        staleNotice: u.staleNotice || null,
         stats: u.stats || { courses: 0, items: 0, files: 0 },
         invitedWith: u.invitedWith,
         reminderCount: u.reminderCount || 0,

@@ -1,6 +1,6 @@
 // 界面读写数据的统一入口。装成插件时用 chrome.storage；
 // 没有 chrome.storage（直接用网页服务器打开 html）时进入演示模式，显示示例数据。
-import { demoData } from './demo.js';
+import { demoData, demoDetail } from './demo.js';
 
 export const KEYS = ['data', 'status', 'overrides', 'overridesAt', 'settings', 'settingsAt', 'cloud', 'updates', 'seenAt', 'pendingUpdate'];
 
@@ -30,7 +30,8 @@ export function createStore() {
       verify: () => chrome.runtime.sendMessage({ type: 'verify' }),
       maybeSync: () => chrome.runtime.sendMessage({ type: 'maybeSync' }),
       testUpdate: () => chrome.runtime.sendMessage({ type: 'testUpdate' }),
-      applyUpdate: () => chrome.runtime.sendMessage({ type: 'applyUpdate' })
+      applyUpdate: () => chrome.runtime.sendMessage({ type: 'applyUpdate' }),
+      detail: (item) => chrome.runtime.sendMessage({ type: 'detail', item: { id: item.id, ids: item.ids, courseId: item.courseId } })
     };
   }
 
@@ -67,6 +68,12 @@ export function createStore() {
     checkUpdate: async () => ({ pending: null }),
     verify: async () => ({ ok: true }),
     maybeSync: async () => ({ ok: true }),
-    applyUpdate: async () => location.reload()
+    applyUpdate: async () => location.reload(),
+    detail: async (item) => {
+      await new Promise((r) => setTimeout(r, 500));
+      const d = demoDetail(item, new Date());
+      mem.details = { ...(mem.details || {}), [item.id]: d };
+      return { ok: true, detail: d };
+    }
   };
 }
