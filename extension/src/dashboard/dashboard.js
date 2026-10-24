@@ -7,7 +7,7 @@ import { buildIcs } from '../lib/ics.js';
 import { BASE_URL } from '../lib/api.js';
 import { downloadPath } from '../lib/materials.js';
 import { createStore, KEYS } from '../store.js';
-import { h, fill, add, icon, I, toast, initials, shortDate, EXT_COLOR, confirmDialog } from './ui.js';
+import { h, fill, icon, I, toast, initials, shortDate, EXT_COLOR, confirmDialog } from './ui.js';
 import { renderSettingsView, setCourseSynced } from './settings.js';
 import { buildPlan } from '../lib/plan.js';
 import { buildFeed, FEED_FILTERS } from '../lib/feed.js';

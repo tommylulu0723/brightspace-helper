@@ -237,7 +237,7 @@ function content(it, d, { now, error, course, download }) {
       d.attachments.filter((f) => f.url).length > 1 ? h('button', { type: 'button', class: 'btn small', onClick: () => download(d.attachments) }, icon(I.download, 14), '全部下载') : null));
   }
   if (d.links.length) {
-    out.push(section('链接', h('ul', { class: 'd-files' }, ...d.links.map((l) => h('li', { class: 'd-file' }, icon(I.external, 16), h('a', { class: 'fname', href: l.url, target: '_blank', rel: 'noopener noreferrer', 'data-no-tr': '' }, l.name))))));
+    out.push(section('相关链接', h('ul', { class: 'd-files' }, ...d.links.map((l) => h('li', { class: 'd-file' }, icon(I.external, 16), h('a', { class: 'fname', href: l.url, target: '_blank', rel: 'noopener noreferrer', 'data-no-tr': '' }, l.name))))));
   }
   if (d.rubrics.length) out.push(section('评分标准', ...d.rubrics.map(rubricTable)));
 

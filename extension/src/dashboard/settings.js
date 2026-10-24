@@ -299,7 +299,7 @@ function renderDiag(body, ctx) {
   if (d) {
     info.push(`上次同步 ${new Date(d.lastSync).toLocaleString()}`, `${d.items.length} 项截止`, `请求 ${d.requestCount} 次`);
     if (d.usingFallback) info.push('通过已打开的 Brightspace 标签页同步');
-    if (d.warnings?.length) info.push(`${d.warnings.length} 条提示：${d.warnings.slice(0, 3).join('；')}`);
+    if (d.warnings?.length) info.push(`${d.warnings.length} 条提示：${d.warnings.slice(0, 3).join(getLang() === 'en' ? '; ' : '；')}`);
   }
   fill(body, 
     h('div', { class: 'btn-row' },

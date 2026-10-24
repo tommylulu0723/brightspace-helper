@@ -1,4 +1,5 @@
 // 界面小工具：建 DOM（文字一律走 textContent，不拼 HTML）、图标、提示条。
+import { tr } from '../lib/i18n.js';
 
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
@@ -72,7 +73,7 @@ export function toast(msg, ms = 4000) {
 }
 
 export function initials(name) {
-  const s = String(name || '').trim();
+  const s = String(tr(name || '')).trim(); // 英文界面下"我的事项"显示成 MI，不是"我的"
   if (/^[一-鿿]/.test(s)) return s.slice(0, 2);
   const stop = new Set(['to', 'and', 'of', 'the', 'in', 'for', 'a', 'an', 'introduction', 'intro', '&', '-', '–']);
   const words = s.split(/[\s:·,()/-]+/).filter((w) => w && !stop.has(w.toLowerCase()) && /[a-z]/i.test(w));

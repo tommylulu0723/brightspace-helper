@@ -57,7 +57,7 @@ const D = [
   ['已逾期，尽快补交', 'Overdue — submit'],
   ['{} · 今日计划', '{} · Today\'s plan'], ['今日计划', 'Today\'s plan'], ['今天先做这 {} 件事', 'Do these {} first today'],
   ['今日计划 · {} 件', 'Today\'s plan · {}'], ['今日计划 · {} 件事', 'Today\'s plan · {} tasks'],
-  ['接下来 3 天没有截止事项{}', 'Nothing due in the next 3 days{}'],
+  ['接下来 3 天没有截止事项{}。可以提前看看"之后"的作业，或者休息一下。', 'Nothing due in the next 3 days{}. Get ahead on "Later" items, or take a break.'],
   ['。可以提前看看"之后"的作业，或者休息一下。', '. Get ahead on "Later" items, or take a break.'],
   ['这几天没有要赶的', 'Nothing urgent these days'], ['件待办', 'to do'],
   ['截止前 3 天开始出现，考试提前 7 天；越急、越重要的越靠前（考试 > 作业 > 讨论）。', 'Items appear 3 days before they\'re due (exams 7 days); the more urgent and important, the higher (exam > assignment > discussion).'],
@@ -310,7 +310,7 @@ const D = [
   ['成绩与评语', 'Grade & feedback'], ['要求', 'Instructions'],
   ['老师没有在 Brightspace 上写考试说明。', 'No exam instructions on Brightspace.'],
   ['老师没有在 Brightspace 上写说明，可能写在附件或课件里。', 'No instructions on Brightspace — they may be in an attachment or the course content.'],
-  ['附件（{}）', 'Attachments ({})'], ['链接', 'Links'], ['评分标准', 'Rubric'], ['我的提交', 'My submissions'],
+  ['附件（{}）', 'Attachments ({})'], ['相关链接', 'Links'], ['评分标准', 'Rubric'], ['我的提交', 'My submissions'],
   ['最近一次', 'Latest'], ['第 {} 次', 'Attempt {}'], ['{} 提交', 'Submitted {}'], ['迟交', 'Late'],
   ['Brightspace 上还没有你的提交记录。', 'No submissions from you on Brightspace yet.'],
   ['在 Brightspace 打开可以看到完整页面。', 'Open it in Brightspace to see the full page.'],
@@ -322,6 +322,25 @@ const D = [
   ['点击立即从 Brightspace 同步', 'Click to sync from Brightspace now'],
   ['超过 2 天没同步时提醒我', 'Tell me when it hasn\'t synced for 2 days'],
   ['比如 Brightspace 登录过期了、电脑一直没开，提醒邮件用的就是旧数据，这时会发邮件告诉你', 'E.g. your Brightspace login expired or your computer was off — reminders would be based on old data, so you get an email'],
+  // ---------- 错误提示（插件 / 服务器返回） ----------
+  ['没有打开的 Brightspace 标签页', 'No open Brightspace tab'], ['标签页请求失败', 'The request through the tab failed'],
+  ['未知错误', 'Unknown error'], ['网络错误', 'network error'], ['Brightspace 返回 {}：{}', 'Brightspace returned {0}: {1}'],
+  ['服务器地址格式不对，例如 https://study.example.com', 'Invalid server address, e.g. https://study.example.com'],
+  ['还没填服务器地址', 'Enter the server address first'], ['服务器返回 {}', 'Server returned {}'], ['请重新登录', 'Please log in again'],
+  ['数据太大', 'The data is too large'], ['请求格式不对', 'Bad request'], ['请先登录', 'Please log in first'], ['账号不存在', 'Account not found'],
+  ['没读到 Brightspace 上的姓名', 'Couldn\'t read your name from Brightspace'], ['先完成 Brightspace 姓名校验', 'Finish the Brightspace name check first'],
+  ['管理员还没设置发信邮箱，暂时发不了邮件', 'The admin hasn\'t set up a sender email yet, so emails can\'t be sent'],
+  ['一小时最多发 {} 封测试邮件', 'You can send up to {} test emails an hour'], ['原密码不对', 'Current password is wrong'],
+  ['管理员暂时关闭了云同步', 'The admin has paused cloud sync'], ['接口不存在', 'Not found'], ['密码太长', 'Password is too long'],
+  ['邮箱格式不对', 'Invalid email address'], ['这个邮箱已经注册过了，直接登录就行', 'This email is already registered — just log in'],
+  ['邀请码不对或已经用完了', 'Invalid or used-up invite code'], ['邮箱或密码不对', 'Wrong email or password'],
+  ['现在登录的 Brightspace 账号和之前绑定的不是同一个人', 'The Brightspace account you\'re logged in to isn\'t the one linked before'],
+  ['这个 Brightspace 账号已经绑定了另一个课程助手账号', 'This Brightspace account is already linked to another Course Helper account'],
+  ['按课程筛选', 'Filter by course'],
+  ['课程助手：先登录 Brightspace，登录后自动同步', 'Course Helper: log in to Brightspace and it syncs automatically'],
+  ['点这里打开 Brightspace 登录，登录后课程助手会自动开始同步。', 'Click to log in to Brightspace — Course Helper starts syncing automatically.'],
+  ['，今天已完成 {} 件', ', {} done today'],
+  ['{} 明天到期', '{} is due tomorrow'], ['插件 {}同步', 'Extension synced {}'],
   ['核对姓名失败：{}', 'Name check failed: {}'], ['正在核对姓名（Brightspace：{} {}）…', 'Checking your name (Brightspace: {0} {1})…'],
 ];
 
@@ -339,7 +358,7 @@ for (const [zh0, en0] of D) {
   let i = 0;
   const tpl = /\{\d\}/.test(en) ? en : en.replace(/\{\}/g, () => `{${i++}}`);
   // 文字一样多时，开头就是固定文字的句型优先（它通常是外层，比如"已过 {}"包着"15 小时"）
-  patterns.push({ re, tpl, weight: parts.join('').length + (parts[0] ? 0.5 : 0) });
+  patterns.push({ re, tpl, weight: parts.join('').length + (parts[0] ? 0.5 : 0), dot: parts[0].startsWith('·'), joined: zh.includes(' · ') });
 }
 patterns.sort((a, b) => b.weight - a.weight);
 // 零碎词：整句和句型都对不上时，至少把常见词换掉
@@ -352,9 +371,13 @@ const SINGULAR = {
   hours: 'hour', attempts: 'attempt', messages: 'message', updates: 'update', submissions: 'submission', modules: 'module'
 };
 
-function single(s, depth) {
+function single(s, depth, onlyDot = false) {
   if (exact.has(s)) return exact.get(s);
+  // 用" · "拼起来的句子：只认本身也带" · "的句型，不然"{} 次"这种短句型会把整句吞掉，下面再拆开分别翻
+  const joined = s.includes(' · ');
   for (const p of patterns) {
+    if (onlyDot && !p.dot) continue;
+    if (joined && !p.joined) continue;
     const m = p.re.exec(s);
     if (!m) continue;
     return p.tpl.replace(/\{(\d)\}( ([A-Za-z]+))?/g, (_, k, sp, word) => {
@@ -368,7 +391,8 @@ function single(s, depth) {
 
 function core(s, depth) {
   // 开头的 "· " 是拼接用的分隔符，先拿掉再翻（不然"{} 小时"这类句型会把它吞进去，翻成"· 15 left h"）
-  if (s.startsWith('· ') && !exact.has(s)) return `· ${tr(s.slice(2), depth + 1)}`;
+  // 词典里本来就以"· "开头的句型（比如" · 发到 {}"）优先
+  if (s.startsWith('· ')) return single(s, depth, true) ?? `· ${tr(s.slice(2), depth + 1)}`;
   const hit = single(s, depth);
   if (hit != null) return hit;
   // 用 " · " 拼起来的句子：拆开分别翻译；能整体对上的几段（比如"本学期 · 未同步"）合在一起翻

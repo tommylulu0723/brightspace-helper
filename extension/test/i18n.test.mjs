@@ -23,6 +23,12 @@ t('开头带"· "的片段：分隔符不会被句型吞掉；作业详情的字
   assert.equal(tr('20 分'), '20 pts');
   assert.equal(tr('更新于 3 分钟前'), 'Updated 3 min ago');
 });
+t('用 · 拼起来的整句不会被"{} 次"这类短句型吞掉；以 · 开头的句型照常', () => {
+  assert.equal(tr('上次同步 x · 13 项截止 · 请求 0 次'), 'Last sync x · 13 deadlines · 0 requests');
+  assert.equal(tr('其他学期 / 其他 · 1'), 'Other terms / other · 1');
+  assert.equal(tr(' · 发到 a@b.com'), ' · sent to a@b.com');
+  assert.equal(tr('接下来 3 天没有截止事项，今天已完成 2 件。可以提前看看"之后"的作业，或者休息一下。'), 'Nothing due in the next 3 days, 2 done today. Get ahead on "Later" items, or take a break.');
+});
 t('英文单复数：1 用单数，其他用复数', () => {
   assert.equal(tr('1 项'), '1 item');
   assert.equal(tr('2 项'), '2 items');

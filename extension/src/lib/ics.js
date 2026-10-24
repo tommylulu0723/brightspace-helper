@@ -1,5 +1,6 @@
 // 生成 .ics 文件，可以导入 Google 日历 / Apple 日历 / Outlook。
 import { TYPE_LABEL } from './format.js';
+import { tr } from './i18n.js';
 
 function esc(s) {
   return String(s || '')
@@ -46,19 +47,19 @@ export function buildIcs(items, courseNames, now = new Date()) {
   ];
   for (const it of items) {
     const course = courseNames[it.courseId] || '';
-    const label = TYPE_LABEL[it.type] || '';
+    const label = TYPE_LABEL[it.type] ? tr(TYPE_LABEL[it.type]) : '';
     lines.push(
       'BEGIN:VEVENT',
       `UID:${esc(it.id.replace(/[^\w:.-]/g, '_'))}@course-helper`,
       `DTSTAMP:${stamp(now.toISOString())}`,
       `DTSTART:${stamp(it.due)}`,
       `DTEND:${stamp(it.due)}`,
-      `SUMMARY:${esc(`[${course}] ${it.title}${label ? `（${label}）` : ''}`)}`,
+      `SUMMARY:${esc(`[${course}] ${it.title}${label ? (/[a-z]/i.test(label) ? ` (${label})` : `（${label}）`) : ''}`)}`,
       `DESCRIPTION:${esc(`${course} · ${label}${it.url ? `\n${it.url}` : ''}`)}`,
       ...(it.url ? [`URL:${esc(it.url)}`] : []),
       'BEGIN:VALARM',
       'ACTION:DISPLAY',
-      `DESCRIPTION:${esc(`${it.title} 明天到期`)}`,
+      `DESCRIPTION:${esc(tr(`${it.title} 明天到期`))}`,
       'TRIGGER:-PT24H',
       'END:VALARM',
       'END:VEVENT'

@@ -191,7 +191,8 @@ async function announceUpdate() {
   }
   let note = '';
   const n = VERSION_NOTES.find((x) => x.v === v);
-  if (n) note = ((await loadLang()) === 'en' && n.en ? n.en : n.items).slice(0, 2).map((x) => `• ${x}`).join('\n');
+  if (!n) return; // 不写更新日志的小修复：安静地更新，不弹"已更新"
+  note = ((await loadLang()) === 'en' && n.en ? n.en : n.items).slice(0, 2).map((x) => `• ${x}`).join('\n');
   notify(`updated:${v}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
@@ -251,7 +252,8 @@ async function refreshBadge() {
   if (status.state === 'error' && status.error?.code === 'AUTH_REQUIRED') {
     await chrome.action.setBadgeBackgroundColor({ color: '#57068C' });
     await chrome.action.setBadgeText({ text: '!' });
-    await setTitleTr({ title: '课程助手：Brightspace 登录已过期，点开重新登录' });
+    // 从来没同步过的新用户不是"过期"，是还没登录
+    await setTitleTr({ title: got.data?.lastSync ? '课程助手：Brightspace 登录已过期，点开重新登录' : '课程助手：先登录 Brightspace，登录后自动同步' });
     return;
   }
   const hidden = new Set(settings.hiddenCourseIds || []);
@@ -377,14 +379,15 @@ async function notifyDueSoon(data) {
 }
 
 async function notifyLoginExpired() {
-  const { settings = {}, loginNotifiedAt } = await chrome.storage.local.get(['settings', 'loginNotifiedAt']);
+  const { settings = {}, loginNotifiedAt, data } = await chrome.storage.local.get(['settings', 'loginNotifiedAt', 'data']);
   if (settings.notify === false) return;
   if (loginNotifiedAt && Date.now() - Date.parse(loginNotifiedAt) < 12 * 3600 * 1000) return;
+  const never = !data?.lastSync;
   notify('login', {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
-    title: 'Brightspace 登录已过期',
-    message: '点这里打开 Brightspace 重新登录，登录后会自动继续同步。',
+    title: never ? '需要登录 Brightspace' : 'Brightspace 登录已过期',
+    message: never ? '点这里打开 Brightspace 登录，登录后课程助手会自动开始同步。' : '点这里打开 Brightspace 重新登录，登录后会自动继续同步。',
     priority: 1
   });
   await chrome.storage.local.set({ loginNotifiedAt: new Date().toISOString() });
@@ -532,7 +535,8 @@ function syncNow(reason, { forceMaterials = false } = {}) {
       await setStatus({ state: 'error', error, lastAttempt: startedAt });
       await refreshBadge();
       if (!offline) pushHealth();
-      if (auth && reason !== 'manual') await notifyLoginExpired();
+      // 刚装好时汇总页会自己打开并提示登录，不用再弹通知
+      if (auth && reason !== 'manual' && reason !== 'install') await notifyLoginExpired();
       return { ok: false, error };
     } finally {
       running = null;
