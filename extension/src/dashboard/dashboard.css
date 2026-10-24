@@ -418,8 +418,11 @@ button.grade-card:hover { border-color: var(--accent); }
 @media (max-width: 760px) {
   .plan-head { flex-direction: column; }
   .plan-count { text-align: left; }
-  .plan-row { flex-wrap: wrap; }
-  .plan-row .chip { margin-left: 64px; }
+  /* 窄屏：编号 + 圆圈 + 标题一行，提示标签放到标题下面（之前 flex-wrap 会把标题挤成一个字宽） */
+  .plan-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr); column-gap: 10px; row-gap: 6px; align-items: start; }
+  .plan-row .plan-rank, .plan-row .check { margin-top: 2px; }
+  .plan-row > .chip { grid-column: 3; justify-self: start; }
+  .plan-row .course-tag { min-width: 0; }
   .tabs { overflow-x: auto; flex-wrap: nowrap; max-width: 100%; }
   .tab { flex: none; }
 }
@@ -599,3 +602,40 @@ body.locked .theme-btn { margin-left: auto; }
 .ok-btn { border-color: var(--ok); color: var(--ok); }
 @media (prefers-reduced-motion: reduce) { .drawer[open] { animation: none; } .d-loading .sk { animation: none; } }
 @media (max-width: 600px) { .drawer-body { padding: 14px 16px 20px; } .drawer-head, .drawer-foot { padding-left: 16px; } }
+
+/* ---------- 顶栏：宽屏一行放下（英文界面更长），窄一点时搜索框换到第二行，手机上更紧凑 ---------- */
+/* 课程标签放不下时显示省略号（inline-flex 里的文字不会出省略号，改成 inline-block） */
+.course-tag { display: inline-block; vertical-align: middle; min-width: 0; }
+.course-tag::before { display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.brand-name, .tab { white-space: nowrap; }
+@media (min-width: 1240px) {
+  .topbar-inner { flex-wrap: nowrap; gap: 10px; }
+  .brand, .tabs, .sync { flex: none; }
+  .search { flex: 1 1 140px; min-width: 120px; }
+}
+@media (max-width: 1519px) {
+  /* "x 分钟前同步"收进同步按钮的提示里，设置按钮只留图标 */
+  .sync-text { display: none; }
+  .account-label { display: none; }
+  .tab { padding: 0 12px; }
+}
+@media (min-width: 761px) and (max-width: 1239px) {
+  /* 第一行：标志 + 右边的按钮；第二行：视图切换 + 搜索 */
+  #fbBtn { margin-left: auto; }
+  .tabs { order: 9; margin-left: 0; }
+  .search { order: 10; flex: 1 1 200px; max-width: none; margin-left: 0; }
+}
+@media (max-width: 480px) {
+  .topbar-inner { gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+  .tab svg { display: none; }
+  .tab { padding: 0 9px; font-size: 13.5px; }
+  .tabs { flex: 1 1 100%; justify-content: space-between; }
+  #syncBtn span { display: none; }
+  #syncBtn { width: 36px; padding: 0; justify-content: center; }
+}
+@media (max-width: 420px) { .brand-name { display: none; } }
+/* 一周条：手机上"今天 / 明天 / Tomorrow"放不下，换成星期几，今天用描边标出来 */
+.wlabel.short { display: none; }
+.wday.today { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.wlabel, .wdate { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 480px) { .wlabel.long { display: none; } .wlabel.short { display: block; } }

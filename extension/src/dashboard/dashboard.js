@@ -127,6 +127,8 @@ function renderTop(now) {
   $('syncBtn').disabled = syncing;
   $('syncIcon').classList.toggle('spin', syncing);
   $('syncText').textContent = syncing ? '正在同步…' : state.data?.lastSync ? `${formatAgo(state.data.lastSync, now)}同步` : '尚未同步';
+  // 窄一点的屏幕上不显示同步时间文字，放到按钮的提示里
+  $('syncBtn').title = `${$('syncText').textContent} · 点击立即从 Brightspace 同步`;
   const c = state.cloud;
   const btn = $('accountBtn');
   if (c?.token && c.user) {
@@ -347,11 +349,12 @@ function renderWeek(items, { now, colors, names }) {
       const heavy = list.length >= 3 || big.length;
       const tip = list.map((it) => `${it.title}（${names[it.courseId] || ''}）`).join('\n');
       return h('button', {
-        type: 'button', class: `wday${heavy ? ' heavy' : ''}${list.length ? '' : ' empty'}${ui.day === k ? ' on' : ''}`,
+        type: 'button', class: `wday${i === 0 ? ' today' : ''}${heavy ? ' heavy' : ''}${list.length ? '' : ' empty'}${ui.day === k ? ' on' : ''}`,
         'aria-pressed': String(ui.day === k), title: tip || '这天没有截止的事项',
         onClick: () => { ui.day = ui.day === k ? null : k; render(); }
       },
-        h('span', { class: 'wlabel' }, label(d, i)),
+        h('span', { class: 'wlabel long' }, label(d, i)),
+        h('span', { class: 'wlabel short' }, WEEKDAY[d.getDay()]),
         h('span', { class: 'wdate' }, `${d.getMonth() + 1}/${d.getDate()}`),
         h('span', { class: 'wbar' }, h('i', { style: `height:${Math.round((list.length / max) * 100)}%` })),
         h('span', { class: 'wcount' }, list.length ? `${list.length} 项` : '—'),

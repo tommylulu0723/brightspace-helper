@@ -48,7 +48,7 @@ const D = [
   ['已截止 · 无法确认是否提交', 'Past due · status unknown'], ['最近已完成', 'Recently done'],
   ['公告', 'Announcement'], ['新课件', 'New file'], ['课件更新', 'File updated'], ['截止时间改动', 'Due date changed'],
   ['新作业', 'New assignment'], ['出分了', 'Graded'], ['成绩变动', 'Grade changed'], ['期末成绩', 'Final grade'],
-  ['课件', 'Files'], ['截止时间', 'Deadlines'], ['成绩', 'Grades'], ['动态', 'Updates'], ['课件库', 'Course files'],
+  ['课件', 'Files'], ['截止时间', 'Deadlines'], ['成绩', 'Grades'], ['动态', 'Updates'], ['课件库', 'Files'],
 
   // ---------- 今日计划 ----------
   ['今天考试 · {}', 'Exam today · {}'], ['{} 天后考试，开始复习', 'Exam in {} days — start reviewing'],
@@ -319,6 +319,7 @@ const D = [
   ['可能是网络问题，或者老师设置了不能通过接口查看。可以直接在 Brightspace 里打开。', 'It may be a network problem, or the course doesn\'t allow it. You can open it in Brightspace directly.'],
   ['开始下载 {} 个文件', 'Downloading {} files'], ['开始下载 {}', 'Downloading {}'], ['{} 个文件下载失败', '{} downloads failed'],
   ['查看详情（按住 Ctrl / ⌘ 点击直接在 Brightspace 打开）', 'View details (Ctrl / ⌘-click to open in Brightspace)'],
+  ['点击立即从 Brightspace 同步', 'Click to sync from Brightspace now'],
   ['超过 2 天没同步时提醒我', 'Tell me when it hasn\'t synced for 2 days'],
   ['比如 Brightspace 登录过期了、电脑一直没开，提醒邮件用的就是旧数据，这时会发邮件告诉你', 'E.g. your Brightspace login expired or your computer was off — reminders would be based on old data, so you get an email'],
   ['核对姓名失败：{}', 'Name check failed: {}'], ['正在核对姓名（Brightspace：{} {}）…', 'Checking your name (Brightspace: {0} {1})…'],
@@ -344,12 +345,23 @@ patterns.sort((a, b) => b.weight - a.weight);
 // 零碎词：整句和句型都对不上时，至少把常见词换掉
 const words = [...exact.entries()].filter(([zh]) => zh.length <= 6).sort((a, b) => b[0].length - a[0].length);
 
+// 英文单复数：数字是 1 时，后面的名词用单数（"1 items" → "1 item"）
+const SINGULAR = {
+  items: 'item', days: 'day', files: 'file', courses: 'course', deadlines: 'deadline', requests: 'request', notes: 'note',
+  attachments: 'attachment', downloads: 'download', tasks: 'task', lectures: 'lecture', pts: 'pt', minutes: 'minute',
+  hours: 'hour', attempts: 'attempt', messages: 'message', updates: 'update', submissions: 'submission', modules: 'module'
+};
+
 function single(s, depth) {
   if (exact.has(s)) return exact.get(s);
   for (const p of patterns) {
     const m = p.re.exec(s);
     if (!m) continue;
-    return p.tpl.replace(/\{(\d)\}/g, (_, k) => tr(m[Number(k) + 1] ?? '', depth + 1));
+    return p.tpl.replace(/\{(\d)\}( ([A-Za-z]+))?/g, (_, k, sp, word) => {
+      const v = tr(m[Number(k) + 1] ?? '', depth + 1);
+      if (word && String(v).trim() === '1' && SINGULAR[word]) return `${v} ${SINGULAR[word]}`;
+      return v + (sp || '');
+    });
   }
   return null;
 }

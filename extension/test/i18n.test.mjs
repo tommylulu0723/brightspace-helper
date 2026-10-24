@@ -23,6 +23,14 @@ t('开头带"· "的片段：分隔符不会被句型吞掉；作业详情的字
   assert.equal(tr('20 分'), '20 pts');
   assert.equal(tr('更新于 3 分钟前'), 'Updated 3 min ago');
 });
+t('英文单复数：1 用单数，其他用复数', () => {
+  assert.equal(tr('1 项'), '1 item');
+  assert.equal(tr('2 项'), '2 items');
+  assert.equal(tr('11 项'), '11 items');
+  assert.equal(tr('1 天'), '1 day');
+  assert.equal(tr('1 分'), '1 pt');
+  assert.equal(tr('{} 项待完成 · {}'.replace('{}', '1').replace('{}', '最多的一天是明天（1 项）。')), '1 to do · Busiest day: Tomorrow (1).');
+});
 t('不认识的中文不报错，常见词尽量替换', () => {
   assert.equal(typeof tr('完全没见过的一句话'), 'string');
   assert.equal(tr('English stays'), 'English stays');

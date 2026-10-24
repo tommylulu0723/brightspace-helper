@@ -7,6 +7,19 @@ export const REQUIRE_LOGIN = !!DEFAULT_SERVER;
 
 export const VERSION_NOTES = [
   {
+    v: '1.8.1',
+    d: '2026-10-24',
+    items: [
+      '窗口拉窄、iPad 分屏和手机上排版更整齐：今日计划的标题不再被挤成一列，课程名放不下时显示省略号',
+      '顶栏更紧凑，英文界面也能一行放下'
+    ],
+    en: [
+      'Cleaner layout in narrow windows, iPad split view and on phones: Today\'s plan titles no longer squeeze into a column, and long course names are truncated neatly',
+      'A more compact top bar that fits on one line in English too',
+      'Fixed "1 items" and similar plurals'
+    ]
+  },
+  {
     v: '1.8.0',
     d: '2026-10-23',
     items: [
